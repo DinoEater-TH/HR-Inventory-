@@ -57,34 +57,8 @@ function run_(action, data) {
     case 'importItemsFromUrl': return importItemsFromUrl(data);
     case 'importItemsFromText': return importItemsFromText(data);
     case 'setup': return setup();
-    case 'cleanupTest': return cleanupTest(); // TEMP
     default: throw Error('ไม่รู้จัก action: ' + action);
   }
-}
-// TEMP cleanup
-function cleanupTest() {
-  const ts=sheet_('Transactions'), tv=ts.getDataRange().getValues();
-  const refund={}, toDelete=[];
-  for(let i=1;i<tv.length;i++){
-    if(String(tv[i][8]).trim()==='ทดสอบระบบ'||String(tv[i][8]).trim()==='ทดสอบผู้ใช้'){
-      const id=String(tv[i][3]).trim();
-      refund[id]=(refund[id]||0)+num_(tv[i][6]);
-      toDelete.push(i+1);
-    }
-  }
-  const s=sheet_('Inventory'), v=s.getDataRange().getValues(), report=[];
-  Object.keys(refund).forEach(id=>{
-    for(let i=1;i<v.length;i++){
-      if(String(v[i][0]).trim()===id){
-        const before=num_(v[i][5]), after=before+refund[id];
-        s.getRange(i+1,6).setValue(after);
-        report.push(String(v[i][2])+': '+before+'->'+after);
-        break;
-      }
-    }
-  });
-  for(let k=toDelete.length-1;k>=0;k--) ts.deleteRow(toDelete[k]);
-  return (report.join(' | ')||'no refund')+' | deleted '+toDelete.length+' row(s)';
 }
 function ss_() { return SpreadsheetApp.openById(SPREADSHEET_ID); }
 function padCode_(v) {
