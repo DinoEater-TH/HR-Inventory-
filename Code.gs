@@ -52,13 +52,43 @@ function run_(action, data) {
     case 'saveAsset': return saveAsset(data || {});
     case 'deleteAsset': return deleteAsset(data);
     case 'recordTransaction': return recordTransaction(data || {});
+    case 'recordBatch': return recordBatch(data || {});
     case 'recordWithdrawalBatch': return recordWithdrawalBatch(data || {});
     case 'importItems': return importItems(data);
     case 'importItemsFromUrl': return importItemsFromUrl(data);
     case 'importItemsFromText': return importItemsFromText(data);
     case 'setup': return setup();
+    case 'cleanupTest': return cleanupTest(); // TEMP
     default: throw Error('ไม่รู้จัก action: ' + action);
   }
+}
+// TEMP: ล้างข้อมูลทดสอบหลายรายการ
+function cleanupTest() {
+  const ts = sheet_('Transactions');
+  const tv = ts.getDataRange().getValues();
+  const delta = {}, toDelete = [];
+  for (let i = 1; i < tv.length; i++) {
+    if (String(tv[i][10]).indexOf('ทดสอบหลายรายการ') >= 0) {
+      const id = String(tv[i][3]).trim();
+      const q = num_(tv[i][6]);
+      const sign = String(tv[i][2]).toUpperCase() === 'IN' ? -1 : 1;
+      delta[id] = (delta[id] || 0) + sign * q;
+      toDelete.push(i + 1);
+    }
+  }
+  const s = sheet_('Inventory'), v = s.getDataRange().getValues(), report = [];
+  Object.keys(delta).forEach(id => {
+    for (let i = 1; i < v.length; i++) {
+      if (String(v[i][0]).trim() === id) {
+        const before = num_(v[i][5]), after = before + delta[id];
+        s.getRange(i + 1, 6).setValue(after);
+        report.push(String(v[i][2]) + ': ' + before + '->' + after);
+        break;
+      }
+    }
+  });
+  for (let k = toDelete.length - 1; k >= 0; k--) ts.deleteRow(toDelete[k]);
+  return (report.join(' | ') || 'no change') + ' | deleted ' + toDelete.length + ' row(s)';
 }
 function ss_() { return SpreadsheetApp.openById(SPREADSHEET_ID); }
 function padCode_(v) {
@@ -76,6 +106,8 @@ function nextCode_(rows, key) {
 }
 function setup() {
   const book = ss_();
+  // ตั้ง time zone ของสเปรดชีตเป็นกรุงเทพฯ เพื่อให้เวลาที่แสดงในชีตตรงกับเวลาจริง (กันชีตแสดงเป็น UTC)
+  if (String(book.getSpreadsheetTimeZone()||'') !== 'Asia/Bangkok') book.setSpreadsheetTimeZone('Asia/Bangkok');
   Object.keys(TABLES).forEach(n => { let s=book.getSheetByName(n); if(!s) s=book.insertSheet(n); if(s.getLastRow()===0) s.appendRow(TABLES[n]); s.setFrozenRows(1); });
   if (!book.getSheetByName('Settings')) { const s=book.insertSheet('Settings'); s.appendRow(['Key','Value']); s.appendRow(['LowStockDefault','5']); }
   importExisting_();
@@ -133,6 +165,35 @@ function recordTransaction(t) {
   update_('Inventory','ItemID',item.ItemID,{Quantity:next,UpdatedAt:new Date()});
   append_('Transactions',{TxnID:id_('TX'),Date:t.Date?new Date(t.Date):new Date(),Type:type,ItemID:item.ItemID,Code:padCode_(item.Code),Name:item.Name,Quantity:q,Unit:item.Unit,Requester:t.Requester||'',Department:t.Department||'',Note:t.Note||'',CreatedAt:new Date()});
   return t.light ? { saved: true, name: item.Name, remaining: next, unit: item.Unit, data: getItemList() } : getDashboard();
+}
+// บันทึกรับเข้า/เบิกออกหลายรายการพร้อมกัน (แดชบอร์ด) — ตรวจครบทุกรายการก่อนเขียนข้อมูล
+function recordBatch(p) {
+  setup();
+  const list = p && Array.isArray(p.items) ? p.items : [];
+  const type = String(p.Type || 'IN').toUpperCase();
+  if (type !== 'IN' && type !== 'OUT') throw Error('ประเภทรายการไม่ถูกต้อง (รับเข้า/เบิกออกเท่านั้น)');
+  if (!list.length) throw Error('กรุณาเพิ่มรายการพัสดุอย่างน้อย 1 รายการ');
+  const inv = rows_('Inventory');
+  const agg = {};
+  list.forEach(li => { const k = String(li.ItemID); agg[k] = (agg[k] || 0) + num_(li.Quantity); });
+  const plan = Object.keys(agg).map(k => {
+    const item = inv.find(x => String(x.ItemID) === k);
+    if (!item) throw Error('ไม่พบรายการพัสดุในคลัง');
+    const q = agg[k];
+    if (q <= 0) throw Error('จำนวนต้องมากกว่า 0');
+    const cur = num_(item.Quantity);
+    if (type === 'OUT' && q > cur) throw Error(item.Name + ' คงเหลือไม่พอ (เหลือ ' + cur + ' ' + item.Unit + ')');
+    return { item: item, q: q, next: type === 'IN' ? cur + q : cur - q };
+  });
+  const now = new Date();
+  const req = String(p.Requester || '').trim();
+  const dept = p.Department || '';
+  const note = p.Note || '';
+  plan.forEach(function (row) {
+    update_('Inventory', 'ItemID', row.item.ItemID, { Quantity: row.next, UpdatedAt: now });
+    append_('Transactions', { TxnID: id_('TX'), Date: now, Type: type, ItemID: row.item.ItemID, Code: padCode_(row.item.Code), Name: row.item.Name, Quantity: row.q, Unit: row.item.Unit, Requester: req, Department: dept, Note: note, CreatedAt: now });
+  });
+  return { saved: true, count: plan.length, type: type, items: plan.map(function (r) { return { Code: padCode_(r.item.Code), Name: r.item.Name, Quantity: r.q, Unit: r.item.Unit, Remaining: r.next }; }), data: getDashboard() };
 }
 // บันทึกการเบิกหลายรายการพร้อมกัน (หน้าเบิกของ) — ตรวจสต็อกครบทุกรายการก่อนเขียนข้อมูล
 function recordWithdrawalBatch(p) {
