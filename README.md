@@ -15,7 +15,8 @@
 ## ความสามารถ
 - แดชบอร์ด: จำนวนรายการ/คงเหลือรวม/มูลค่า/ครุภัณฑ์/รายการใกล้หมด + สรุปตามหมวดหมู่
 - เพิ่ม แก้ไข ลบ พัสดุและครุภัณฑ์ (มีปุ่มลบพร้อมยืนยัน)
-- รับเข้า / เบิกออก พร้อมเลือกหน่วยงาน (งานกลยุทธ์ฯ · งานบริการฯ · งานพัฒนาฯ · งานสวัสดิการฯ)
+- รับเข้า / เบิกออก **หลายรายการต่อครั้งได้** (เพิ่มลงตะกร้า → บันทึกทั้งหมด พร้อมใบสรุปผล), ปรับยอดคงเหลือแบบรายการเดียว
+- เลือกหน่วยงานได้: งานกลยุทธ์ฯ · งานบริการฯ · งานพัฒนาฯ · งานสวัสดิการฯ
 - รหัสพัสดุอัตโนมัติ 4 หลัก (`0001`–`9999`)
 - นำเข้ารายการจาก **ไฟล์ CSV** หรือ **ลิงก์** (Google Sheet / CSV)
 - หน้าเบิกของแยกเฉพาะ: **เลือกได้หลายรายการต่อครั้ง**, บันทึกแล้วขึ้น **หน้าต่างใบเบิก**,
@@ -41,7 +42,7 @@ README.md        ไฟล์นี้
 - **สำรองเมื่อ CORS มีปัญหา (GET + JSONP):** `?action=...&callback=myFunc`
 
 action ที่รองรับ: `getDashboard, getItemList, getNextItemCode, getNextAssetCode, saveItem, deleteItem,
-saveAsset, deleteAsset, recordTransaction, recordWithdrawalBatch, importItems, importItemsFromUrl,
+saveAsset, deleteAsset, recordTransaction, recordBatch, recordWithdrawalBatch, importItems, importItemsFromUrl,
 importItemsFromText, setup`
 
 ตอบกลับเป็น JSON รูปแบบ `{ "ok": true, "result": ... }` หรือ `{ "ok": false, "error": "..." }`

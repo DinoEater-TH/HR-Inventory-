@@ -58,37 +58,8 @@ function run_(action, data) {
     case 'importItemsFromUrl': return importItemsFromUrl(data);
     case 'importItemsFromText': return importItemsFromText(data);
     case 'setup': return setup();
-    case 'cleanupTest': return cleanupTest(); // TEMP
     default: throw Error('ไม่รู้จัก action: ' + action);
   }
-}
-// TEMP: ล้างข้อมูลทดสอบหลายรายการ
-function cleanupTest() {
-  const ts = sheet_('Transactions');
-  const tv = ts.getDataRange().getValues();
-  const delta = {}, toDelete = [];
-  for (let i = 1; i < tv.length; i++) {
-    if (String(tv[i][10]).indexOf('ทดสอบหลายรายการ') >= 0) {
-      const id = String(tv[i][3]).trim();
-      const q = num_(tv[i][6]);
-      const sign = String(tv[i][2]).toUpperCase() === 'IN' ? -1 : 1;
-      delta[id] = (delta[id] || 0) + sign * q;
-      toDelete.push(i + 1);
-    }
-  }
-  const s = sheet_('Inventory'), v = s.getDataRange().getValues(), report = [];
-  Object.keys(delta).forEach(id => {
-    for (let i = 1; i < v.length; i++) {
-      if (String(v[i][0]).trim() === id) {
-        const before = num_(v[i][5]), after = before + delta[id];
-        s.getRange(i + 1, 6).setValue(after);
-        report.push(String(v[i][2]) + ': ' + before + '->' + after);
-        break;
-      }
-    }
-  });
-  for (let k = toDelete.length - 1; k >= 0; k--) ts.deleteRow(toDelete[k]);
-  return (report.join(' | ') || 'no change') + ' | deleted ' + toDelete.length + ' row(s)';
 }
 function ss_() { return SpreadsheetApp.openById(SPREADSHEET_ID); }
 function padCode_(v) {
