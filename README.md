@@ -54,6 +54,8 @@ clasp deploy -d "คำอธิบาย"         # ได้ URL ใหม่ 
 git add -A ; git commit -m "..." ; git push
 ```
 หน้าเว็บอัปเดตทันทีที่ `git push` (GitHub Pages build เอง)
+> หมายเหตุ: เมื่อแก้ `config.js` ให้เพิ่ม `?v=` เลขใหม่ที่แท็ก `<script src="config.js?v=...">`
+> ใน `index.html` และ `withdraw.html` ด้วย เพื่อไม่ให้เบราว์เซอร์ใช้ไฟล์เก่าจากแคช
 
 ## ข้อมูล
 ผูกกับ Google Spreadsheet ID `11voKZ1nFezcgt5Jz2SaBNs4-th7V7xrNKZ2fkz1Fsqo`
