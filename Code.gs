@@ -32,7 +32,12 @@ function handle_(req) {
     const action = String(req.action || '');
     if (!action) throw Error('ไม่ระบุ action');
     let data = req.data;
-    if (typeof data === 'string') data = data ? JSON.parse(data) : null;
+    if (typeof data === 'string') {
+      const s = data.trim();
+      if (!s) data = null;
+      else if (s.charAt(0) === '{' || s.charAt(0) === '[') data = JSON.parse(s);
+      // สตริงธรรมดา (เช่น รหัส ItemID) ปล่อยไว้เป็น string ตามเดิม
+    }
     out = { ok: true, result: run_(action, data) };
   } catch (err) {
     out = { ok: false, error: String((err && err.message) || err) };
@@ -50,12 +55,12 @@ function run_(action, data) {
     case 'getNextItemCode': return getNextItemCode();
     case 'getNextAssetCode': return getNextAssetCode();
     case 'saveItem': return saveItem(data || {});
-    case 'deleteItem': return deleteItem(data && data.id);
+    case 'deleteItem': return deleteItem(idOf_(data));
     case 'saveAsset': return saveAsset(data || {});
-    case 'deleteAsset': return deleteAsset(data && data.id);
+    case 'deleteAsset': return deleteAsset(idOf_(data));
     case 'borrowAsset': return borrowAsset(data || {});
     case 'returnAsset': return returnAsset(data || {});
-    case 'deleteAssetLoan': return deleteAssetLoan(data && data.id);
+    case 'deleteAssetLoan': return deleteAssetLoan(idOf_(data));
     case 'recordTransaction': return recordTransaction(data || {});
     case 'recordBatch': return recordBatch(data || {});
     case 'recordWithdrawalBatch': return recordWithdrawalBatch(data || {});
@@ -63,11 +68,16 @@ function run_(action, data) {
     case 'importItemsFromUrl': return importItemsFromUrl(data);
     case 'importItemsFromText': return importItemsFromText(data);
     case 'setup': return setup();
-    case 'cleanupAssetTest': return cleanupAssetTest(); // TEMP
     default: throw Error('ไม่รู้จัก action: ' + action);
   }
 }
 function ss_() { return SpreadsheetApp.openById(SPREADSHEET_ID); }
+// รับได้ทั้ง {id:'IT...'} และ 'IT...' (รองรับหน้าเว็บรุ่นเก่าที่ cache อยู่)
+function idOf_(data) {
+  if (data === null || data === undefined) return '';
+  if (typeof data === 'object') return String(data.id || data.ID || data.ItemID || data.AssetID || data.LoanID || '');
+  return String(data);
+}
 function padCode_(v) {
   const s=String(v===undefined||v===null?'':v).trim();
   if(!s) return '';
@@ -297,16 +307,6 @@ function deleteAsset(id) {
   const active=rows_('AssetLoans').find(x=>String(x.AssetID)===String(id)&&String(x.Status)==='กำลังยืม');
   if(active)throw Error('ไม่สามารถลบครุภัณฑ์ที่กำลังถูกยืมได้ กรุณาบันทึกคืนก่อน');
   const r=findRow_('Assets','AssetID',id);if(r<0)throw Error('ไม่พบข้อมูล');sheet_('Assets').deleteRow(r);return getDashboard();
-}
-// TEMP: ลบข้อมูลทดสอบระบบยืม–คืนก่อน deploy รอบสุดท้าย
-function cleanupAssetTest() {
-  const loans=sheet_('AssetLoans'), lv=loans.getDataRange().getValues(), lh=lv[0], nCol=lh.indexOf('Note');
-  let deletedLoans=0;
-  for(let i=lv.length-1;i>=1;i--) if(String(lv[i][nCol]||'').indexOf('ทดสอบระบบยืมครุภัณฑ์')>=0){loans.deleteRow(i+1);deletedLoans++;}
-  const assets=sheet_('Assets'), av=assets.getDataRange().getValues(), ah=av[0], noteCol=ah.indexOf('Note');
-  let deletedAssets=0;
-  for(let i=av.length-1;i>=1;i--) if(String(av[i][noteCol]||'').indexOf('ทดสอบระบบยืมครุภัณฑ์')>=0){assets.deleteRow(i+1);deletedAssets++;}
-  return {deletedLoans:deletedLoans,deletedAssets:deletedAssets};
 }
 function importItems(data) {
   setup();
