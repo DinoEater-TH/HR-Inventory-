@@ -2,6 +2,7 @@
  * ใช้กับ Spreadsheet ID ที่ระบุไว้ด้านล่าง ไม่ต้องเขียนโค้ดเพิ่ม
  */
 const SPREADSHEET_ID = '11voKZ1nFezcgt5Jz2SaBNs4-th7V7xrNKZ2fkz1Fsqo';
+const CATEGORIES = ['กระดาษ','อุปกรณ์เขียนและลบ','แฟ้มและซอง','อุปกรณ์หนีบและเย็บ','กาวและเทป','อุปกรณ์ตัดและวัด','ตรายางและหมึก','ไอทีและอิเล็กทรอนิกส์','สมุดและเบ็ดเตล็ด','อุปกรณ์จัดเก็บเอกสาร','อื่นๆ'];
 const TABLES = {
   Inventory: ['ItemID','Code','Name','Category','Unit','Quantity','MinStock','Price','Location','Type','Status','UpdatedAt','Notes'],
   Transactions: ['TxnID','Date','Type','ItemID','Code','Name','Quantity','Unit','Requester','Department','Note','CreatedAt'],
@@ -125,7 +126,7 @@ function getNextItemCode() { setup(); return nextCode_(rows_('Inventory'),'Code'
 function saveItem(item) {
   setup(); const now=new Date();
   const code=padCode_(item.Code)||nextCode_(rows_('Inventory'),'Code');
-  const o={ItemID:item.ItemID||id_('IT'),Code:code,Name:String(item.Name||'').trim(),Category:item.Category||'ทั่วไป',Unit:item.Unit||'ชิ้น',Quantity:num_(item.Quantity),MinStock:num_(item.MinStock),Price:num_(item.Price),Location:item.Location||'',Type:item.Type||'พัสดุ',Status:item.Status||'ใช้งาน',UpdatedAt:now,Notes:item.Notes||''};
+  const o={ItemID:item.ItemID||id_('IT'),Code:code,Name:String(item.Name||'').trim(),Category:item.Category||'อื่นๆ',Unit:item.Unit||'ชิ้น',Quantity:num_(item.Quantity),MinStock:num_(item.MinStock),Price:num_(item.Price),Location:item.Location||'',Type:item.Type||'พัสดุ',Status:item.Status||'ใช้งาน',UpdatedAt:now,Notes:item.Notes||''};
   if(!o.Name)throw Error('กรุณาระบุชื่อรายการ');
   if(item.ItemID)update_('Inventory','ItemID',item.ItemID,o);else append_('Inventory',o); return getDashboard();
 }
@@ -219,7 +220,7 @@ function importItems(data) {
   const inv=rows_('Inventory'), existing=inv.map(x=>padCode_(x.Code)).filter(Boolean);
   let max=0; inv.forEach(r=>{const m=String(r.Code||'').trim().match(/^0*(\d+)$/);if(m){const n=parseInt(m[1],10);if(n>max)max=n;}});
   let added=0,skipped=0;
-  data.forEach(r=>{const name=String(r.Name||r['ชื่อรายการ']||r['รายการ']||r['ชื่อพัสดุ']||'').trim();if(!name){skipped++;return;}let code=padCode_(r.Code||r['รหัส']||r['รหัสพัสดุ']||r['ลำดับ']||'');if(code&&existing.indexOf(code)>=0){skipped++;return;}if(!code){code=padCode_(++max);}else{const m=code.match(/^0*(\d+)$/);if(m&&parseInt(m[1],10)>max)max=parseInt(m[1],10);}append_('Inventory',{ItemID:id_('IT'),Code:code,Name:name,Category:r.Category||r['หมวดหมู่']||r['ประเภท']||'ทั่วไป',Unit:r.Unit||r['หน่วย']||'ชิ้น',Quantity:num_(r.Quantity||r['จำนวน']||r['คงเหลือ']),MinStock:num_(r.MinStock||r['ขั้นต่ำ']||5),Price:num_(r.Price||r['ราคา']||r['ราคาต่อหน่วย']),Location:r.Location||r['สถานที่']||r['จุดเก็บ']||'',Type:r.Type||'พัสดุ',Status:'ใช้งาน',UpdatedAt:new Date(),Notes:r.Notes||r['หมายเหตุ']||''});if(code)existing.push(code);added++;});
+  data.forEach(r=>{const name=String(r.Name||r['ชื่อรายการ']||r['รายการ']||r['ชื่อพัสดุ']||'').trim();if(!name){skipped++;return;}let code=padCode_(r.Code||r['รหัส']||r['รหัสพัสดุ']||r['ลำดับ']||'');if(code&&existing.indexOf(code)>=0){skipped++;return;}if(!code){code=padCode_(++max);}else{const m=code.match(/^0*(\d+)$/);if(m&&parseInt(m[1],10)>max)max=parseInt(m[1],10);}append_('Inventory',{ItemID:id_('IT'),Code:code,Name:name,Category:r.Category||r['หมวดหมู่']||r['ประเภท']||'อื่นๆ',Unit:r.Unit||r['หน่วย']||'ชิ้น',Quantity:num_(r.Quantity||r['จำนวน']||r['คงเหลือ']),MinStock:num_(r.MinStock||r['ขั้นต่ำ']||5),Price:num_(r.Price||r['ราคา']||r['ราคาต่อหน่วย']),Location:r.Location||r['สถานที่']||r['จุดเก็บ']||'',Type:r.Type||'พัสดุ',Status:'ใช้งาน',UpdatedAt:new Date(),Notes:r.Notes||r['หมายเหตุ']||''});if(code)existing.push(code);added++;});
   return {added,skipped,data:getDashboard()};
 }
 function importItemsFromUrl(url) {
@@ -253,4 +254,4 @@ function parseCsv_(text) {
 }
 
 // นำข้อมูลจากแท็บเดิมเข้าคลังครั้งแรก หากพบหัวตารางภาษาไทย/อังกฤษที่รู้จัก
-function importExisting_() { const target=sheet_('Inventory'); if(target.getLastRow()>1)return; const skip=['Inventory','Transactions','Assets','Settings']; const source=ss_().getSheets().find(s=>skip.indexOf(s.getName())<0&&s.getLastRow()>1); if(!source)return; const v=source.getDataRange().getValues(), h=v[0].map(x=>String(x).trim().toLowerCase()); const col=(names)=>{for(const n of names){const i=h.indexOf(n.toLowerCase());if(i>=0)return i;}return -1;}; const name=col(['name','รายการ','ชื่อรายการ','ชื่อพัสดุ']), qty=col(['quantity','จำนวน','คงเหลือ','ยอดคงเหลือ']); if(name<0||qty<0)return; const code=col(['code','รหัส','รหัสพัสดุ']),cat=col(['category','หมวดหมู่','ประเภท']),unit=col(['unit','หน่วย']),price=col(['price','ราคา','ราคาต่อหน่วย']),loc=col(['location','สถานที่','จุดเก็บ']); v.slice(1).forEach(r=>{if(!r[name])return;append_('Inventory',{ItemID:id_('IT'),Code:code<0?'':r[code],Name:r[name],Category:cat<0?'ทั่วไป':r[cat],Unit:unit<0?'ชิ้น':r[unit],Quantity:num_(r[qty]),MinStock:5,Price:price<0?0:num_(r[price]),Location:loc<0?'':r[loc],Type:'พัสดุ',Status:'ใช้งาน',UpdatedAt:new Date(),Notes:''});}); }
+function importExisting_() { const target=sheet_('Inventory'); if(target.getLastRow()>1)return; const skip=['Inventory','Transactions','Assets','Settings']; const source=ss_().getSheets().find(s=>skip.indexOf(s.getName())<0&&s.getLastRow()>1); if(!source)return; const v=source.getDataRange().getValues(), h=v[0].map(x=>String(x).trim().toLowerCase()); const col=(names)=>{for(const n of names){const i=h.indexOf(n.toLowerCase());if(i>=0)return i;}return -1;}; const name=col(['name','รายการ','ชื่อรายการ','ชื่อพัสดุ']), qty=col(['quantity','จำนวน','คงเหลือ','ยอดคงเหลือ']); if(name<0||qty<0)return; const code=col(['code','รหัส','รหัสพัสดุ']),cat=col(['category','หมวดหมู่','ประเภท']),unit=col(['unit','หน่วย']),price=col(['price','ราคา','ราคาต่อหน่วย']),loc=col(['location','สถานที่','จุดเก็บ']); v.slice(1).forEach(r=>{if(!r[name])return;append_('Inventory',{ItemID:id_('IT'),Code:code<0?'':r[code],Name:r[name],Category:cat<0?'อื่นๆ':r[cat],Unit:unit<0?'ชิ้น':r[unit],Quantity:num_(r[qty]),MinStock:5,Price:price<0?0:num_(r[price]),Location:loc<0?'':r[loc],Type:'พัสดุ',Status:'ใช้งาน',UpdatedAt:new Date(),Notes:''});}); }
