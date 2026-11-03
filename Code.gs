@@ -50,12 +50,12 @@ function run_(action, data) {
     case 'getNextItemCode': return getNextItemCode();
     case 'getNextAssetCode': return getNextAssetCode();
     case 'saveItem': return saveItem(data || {});
-    case 'deleteItem': return deleteItem(data);
+    case 'deleteItem': return deleteItem(data && data.id);
     case 'saveAsset': return saveAsset(data || {});
-    case 'deleteAsset': return deleteAsset(data);
+    case 'deleteAsset': return deleteAsset(data && data.id);
     case 'borrowAsset': return borrowAsset(data || {});
     case 'returnAsset': return returnAsset(data || {});
-    case 'deleteAssetLoan': return deleteAssetLoan(data);
+    case 'deleteAssetLoan': return deleteAssetLoan(data && data.id);
     case 'recordTransaction': return recordTransaction(data || {});
     case 'recordBatch': return recordBatch(data || {});
     case 'recordWithdrawalBatch': return recordWithdrawalBatch(data || {});
