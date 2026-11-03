@@ -6,7 +6,8 @@ const CATEGORIES = ['กระดาษ','อุปกรณ์เขียน�
 const TABLES = {
   Inventory: ['ItemID','Code','Name','Category','Unit','Quantity','MinStock','Price','Location','Type','Status','UpdatedAt','Notes'],
   Transactions: ['TxnID','Date','Type','ItemID','Code','Name','Quantity','Unit','Requester','Department','Note','CreatedAt'],
-  Assets: ['AssetID','AssetCode','Name','Category','Department','Location','Responsible','Status','PurchaseDate','Cost','Note','UpdatedAt']
+  Assets: ['AssetID','AssetCode','Name','Category','Department','Location','Responsible','Status','PurchaseDate','Cost','Note','UpdatedAt'],
+  AssetLoans: ['LoanID','AssetID','AssetCode','AssetName','Borrower','Department','Purpose','BorrowDate','DueDate','ConditionBefore','Status','ReturnDate','ReturnedComplete','ConditionAfter','Note','CreatedAt','UpdatedAt']
 };
 
 /* ===== Apps Script = API รับ–ส่งข้อมูลเท่านั้น (JSON) =====
@@ -52,6 +53,9 @@ function run_(action, data) {
     case 'deleteItem': return deleteItem(data);
     case 'saveAsset': return saveAsset(data || {});
     case 'deleteAsset': return deleteAsset(data);
+    case 'borrowAsset': return borrowAsset(data || {});
+    case 'returnAsset': return returnAsset(data || {});
+    case 'deleteAssetLoan': return deleteAssetLoan(data);
     case 'recordTransaction': return recordTransaction(data || {});
     case 'recordBatch': return recordBatch(data || {});
     case 'recordWithdrawalBatch': return recordWithdrawalBatch(data || {});
@@ -59,6 +63,7 @@ function run_(action, data) {
     case 'importItemsFromUrl': return importItemsFromUrl(data);
     case 'importItemsFromText': return importItemsFromText(data);
     case 'setup': return setup();
+    case 'cleanupAssetTest': return cleanupAssetTest(); // TEMP
     default: throw Error('ไม่รู้จัก action: ' + action);
   }
 }
@@ -84,7 +89,8 @@ function setup() {
   if (!book.getSheetByName('Settings')) { const s=book.insertSheet('Settings'); s.appendRow(['Key','Value']); s.appendRow(['LowStockDefault','5']); }
   importExisting_();
   normalizeCodes_('Inventory','Code');
-  normalizeCodes_('Assets','AssetCode');
+  const assetSheet = sheet_('Assets');
+  assetSheet.getRange(2, 2, Math.max(1, assetSheet.getMaxRows() - 1), 1).setNumberFormat('@');
   return 'พร้อมใช้งาน';
 }
 function normalizeCodes_(table, key) {
@@ -116,11 +122,11 @@ function update_(n,key,value,o) { const s=sheet_(n), v=s.getDataRange().getValue
 
 function getDashboard() {
   setup();
-  const inventory=rows_('Inventory').map(x=>Object.assign({},x,{Code:padCode_(x.Code)})), tx=rows_('Transactions'), assets=rows_('Assets').map(x=>Object.assign({},x,{AssetCode:padCode_(x.AssetCode)}));
+  const inventory=rows_('Inventory').map(x=>Object.assign({},x,{Code:padCode_(x.Code)})), tx=rows_('Transactions'), assets=rows_('Assets').map(x=>Object.assign({},x,{AssetCode:String(x.AssetCode||'').trim()})), assetLoans=rows_('AssetLoans').slice(-200).reverse();
   const low=inventory.filter(x=>num_(x.Quantity)<=num_(x.MinStock)&&String(x.Status||'ใช้งาน')!=='ยกเลิก');
   const totalQty=inventory.reduce((a,x)=>a+num_(x.Quantity),0), totalValue=inventory.reduce((a,x)=>a+num_(x.Quantity)*num_(x.Price),0);
   const cats={}; inventory.forEach(x=>cats[x.Category||'ไม่ระบุ']=(cats[x.Category||'ไม่ระบุ']||0)+num_(x.Quantity));
-  return json_({inventory,assets,transactions:tx.slice(-100).reverse(),low,categories:cats,nextItemCode:nextCode_(inventory,'Code'),nextAssetCode:nextCode_(assets,'AssetCode'),summary:{items:inventory.length,quantity:totalQty,value:totalValue,assets:assets.length,low:low.length}});
+  return json_({inventory,assets,assetLoans,transactions:tx.slice(-100).reverse(),low,categories:cats,nextItemCode:nextCode_(inventory,'Code'),summary:{items:inventory.length,quantity:totalQty,value:totalValue,assets:assets.length,low:low.length}});
 }
 function getNextItemCode() { setup(); return nextCode_(rows_('Inventory'),'Code'); }
 function saveItem(item) {
@@ -205,15 +211,103 @@ function getItemList() {
 function getNextAssetCode() { setup(); return nextCode_(rows_('Assets'),'AssetCode'); }
 function saveAsset(a) {
   setup();
+  const code=String(a.AssetCode||'').trim();
+  if(!code)throw Error('กรุณาระบุหมายเลขรหัสครุภัณฑ์');
   const name=String(a.Name||'').trim();
   if(!name)throw Error('กรุณาระบุชื่อครุภัณฑ์');
-  const code=padCode_(a.AssetCode)||nextCode_(rows_('Assets'),'AssetCode');
+  const dup=rows_('Assets').find(x=>String(x.AssetCode||'').trim()===code && String(x.AssetID)!==String(a.AssetID||''));
+  if(dup)throw Error('รหัสครุภัณฑ์นี้มีอยู่ในระบบแล้ว: '+code);
   const o={AssetID:a.AssetID||id_('AS'),AssetCode:code,Name:name,Category:a.Category||'ครุภัณฑ์สำนักงาน',Department:a.Department||'',Location:a.Location||'',Responsible:a.Responsible||'',Status:a.Status||'ใช้งาน',PurchaseDate:a.PurchaseDate?new Date(a.PurchaseDate):'',Cost:num_(a.Cost),Note:a.Note||'',UpdatedAt:new Date()};
   if(a.AssetID)update_('Assets','AssetID',a.AssetID,o);else append_('Assets',o);
   return getDashboard();
 }
+function borrowAsset(p) {
+  setup();
+  const asset=rows_('Assets').find(x=>String(x.AssetID)===String(p.AssetID));
+  if(!asset)throw Error('ไม่พบข้อมูลครุภัณฑ์');
+  if(String(asset.Status||'')==='ถูกยืม')throw Error('ครุภัณฑ์ชิ้นนี้กำลังถูกยืมอยู่ กรุณาบันทึกคืนก่อน');
+  if(String(asset.Status||'')==='ชำรุด'||String(asset.Status||'')==='จำหน่าย')throw Error('ครุภัณฑ์สถานะ '+asset.Status+' ไม่สามารถยืมได้');
+  const borrower=String(p.Borrower||'').trim();
+  if(!borrower)throw Error('กรุณาระบุชื่อผู้ยืม');
+  const borrowDate=String(p.BorrowDate||'').trim();
+  if(!borrowDate)throw Error('กรุณาระบุวันที่ยืม');
+  const dueDate=String(p.DueDate||'').trim();
+  if(!dueDate)throw Error('กรุณาระบุวันที่กำหนดคืน');
+  const purpose=String(p.Purpose||'').trim();
+  if(!purpose)throw Error('กรุณาระบุว่านำไปใช้ในงานอะไร');
+  const condBefore=String(p.ConditionBefore||'ปกติ/พร้อมใช้งาน').trim();
+  const now=new Date();
+  const loan={
+    LoanID:id_('LN'),
+    AssetID:asset.AssetID,
+    AssetCode:String(asset.AssetCode||'').trim(),
+    AssetName:asset.Name,
+    Borrower:borrower,
+    Department:p.Department||'',
+    Purpose:purpose,
+    BorrowDate:borrowDate,
+    DueDate:dueDate,
+    ConditionBefore:condBefore,
+    Status:'กำลังยืม',
+    ReturnDate:'',
+    ReturnedComplete:'',
+    ConditionAfter:'',
+    Note:p.Note||'',
+    CreatedAt:now,
+    UpdatedAt:now
+  };
+  append_('AssetLoans',loan);
+  update_('Assets','AssetID',asset.AssetID,{Status:'ถูกยืม',UpdatedAt:now});
+  return getDashboard();
+}
+function returnAsset(p) {
+  setup();
+  const loan=rows_('AssetLoans').find(x=>String(x.LoanID)===String(p.LoanID));
+  if(!loan)throw Error('ไม่พบรายการยืมครุภัณฑ์');
+  const retDate=String(p.ReturnDate||'').trim();
+  if(!retDate)throw Error('กรุณาระบุวันที่คืน');
+  const complete=String(p.ReturnedComplete||'ครบถ้วน').trim();
+  const condAfter=String(p.ConditionAfter||'ปกติ/พร้อมใช้งาน').trim();
+  const now=new Date();
+  update_('AssetLoans','LoanID',loan.LoanID,{
+    Status:'คืนแล้ว',
+    ReturnDate:retDate,
+    ReturnedComplete:complete,
+    ConditionAfter:condAfter,
+    Note:p.Note!==undefined?p.Note:(loan.Note||''),
+    UpdatedAt:now
+  });
+  const nextStatus = condAfter.indexOf('ชำรุด')>=0 ? 'ชำรุด' : 'ใช้งาน';
+  try { update_('Assets','AssetID',loan.AssetID,{Status:nextStatus,UpdatedAt:now}); } catch(_){}
+  return getDashboard();
+}
+function deleteAssetLoan(id) {
+  setup();
+  const loan=rows_('AssetLoans').find(x=>String(x.LoanID)===String(id));
+  const r=findRow_('AssetLoans','LoanID',id);
+  if(r<0)throw Error('ไม่พบข้อมูลการยืม');
+  sheet_('AssetLoans').deleteRow(r);
+  if(loan && String(loan.Status)==='กำลังยืม') {
+    try { update_('Assets','AssetID',loan.AssetID,{Status:'ใช้งาน',UpdatedAt:new Date()}); } catch(_){}
+  }
+  return getDashboard();
+}
 function deleteItem(id) { const r=findRow_('Inventory','ItemID',id);if(r<0)throw Error('ไม่พบข้อมูล');sheet_('Inventory').deleteRow(r);return getDashboard(); }
-function deleteAsset(id) { const r=findRow_('Assets','AssetID',id);if(r<0)throw Error('ไม่พบข้อมูล');sheet_('Assets').deleteRow(r);return getDashboard(); }
+function deleteAsset(id) {
+  const active=rows_('AssetLoans').find(x=>String(x.AssetID)===String(id)&&String(x.Status)==='กำลังยืม');
+  if(active)throw Error('ไม่สามารถลบครุภัณฑ์ที่กำลังถูกยืมได้ กรุณาบันทึกคืนก่อน');
+  const r=findRow_('Assets','AssetID',id);if(r<0)throw Error('ไม่พบข้อมูล');sheet_('Assets').deleteRow(r);return getDashboard();
+}
+// TEMP: ลบข้อมูลทดสอบระบบยืม–คืนก่อน deploy รอบสุดท้าย
+function cleanupAssetTest() {
+  const loans=sheet_('AssetLoans'), lv=loans.getDataRange().getValues(), lh=lv[0], nCol=lh.indexOf('Note');
+  let deletedLoans=0;
+  for(let i=lv.length-1;i>=1;i--) if(String(lv[i][nCol]||'').indexOf('ทดสอบระบบยืมครุภัณฑ์')>=0){loans.deleteRow(i+1);deletedLoans++;}
+  const assets=sheet_('Assets'), av=assets.getDataRange().getValues(), ah=av[0], noteCol=ah.indexOf('Note');
+  let deletedAssets=0;
+  for(let i=av.length-1;i>=1;i--) if(String(av[i][noteCol]||'').indexOf('ทดสอบระบบยืมครุภัณฑ์')>=0){assets.deleteRow(i+1);deletedAssets++;}
+  return {deletedLoans:deletedLoans,deletedAssets:deletedAssets};
+}
 function importItems(data) {
   setup();
   if (!Array.isArray(data) || !data.length) throw Error('ไม่พบข้อมูลในไฟล์');
