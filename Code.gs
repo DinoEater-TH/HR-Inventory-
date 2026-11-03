@@ -162,26 +162,69 @@ function recordBatch(p) {
   if (type !== 'IN' && type !== 'OUT') throw Error('ประเภทรายการไม่ถูกต้อง (รับเข้า/เบิกออกเท่านั้น)');
   if (!list.length) throw Error('กรุณาเพิ่มรายการพัสดุอย่างน้อย 1 รายการ');
   const inv = rows_('Inventory');
-  const agg = {};
-  list.forEach(li => { const k = String(li.ItemID); agg[k] = (agg[k] || 0) + num_(li.Quantity); });
-  const plan = Object.keys(agg).map(k => {
-    const item = inv.find(x => String(x.ItemID) === k);
-    if (!item) throw Error('ไม่พบรายการพัสดุในคลัง');
-    const q = agg[k];
+  const normName = function (s) { return String(s || '').trim().replace(/\s+/g, ' ').toLowerCase(); };
+  const byName = {};
+  inv.forEach(function (x) { const k = normName(x.Name); if (k && !byName[k]) byName[k] = x; });
+
+  const agg = {};      // ItemID -> จำนวน
+  const newItems = []; // รายการใหม่ที่ยังไม่มีในคลัง
+  list.forEach(function (li) {
+    const q = num_(li && li.Quantity);
     if (q <= 0) throw Error('จำนวนต้องมากกว่า 0');
-    const cur = num_(item.Quantity);
-    if (type === 'OUT' && q > cur) throw Error(item.Name + ' คงเหลือไม่พอ (เหลือ ' + cur + ' ' + item.Unit + ')');
-    return { item: item, q: q, next: type === 'IN' ? cur + q : cur - q };
+    const isNew = li && (li.New || li.NewName || (!li.ItemID && li.Name));
+    if (isNew) {
+      if (type !== 'IN') throw Error('การเบิกออกต้องเลือกรายการที่อยู่ในคลังเท่านั้น');
+      const name = String(li.NewName || li.Name || '').trim().replace(/\s+/g, ' ');
+      if (!name) throw Error('กรุณาระบุชื่อรายการใหม่');
+      // ถ้ามีชื่อซ้ำกับของเดิมอยู่แล้ว ให้รวมเข้าของเดิม (กันข้อมูลซ้ำ)
+      const exist = byName[normName(name)];
+      if (exist) { const k = String(exist.ItemID); agg[k] = (agg[k] || 0) + q; return; }
+      const found = newItems.filter(function (n) { return normName(n.name) === normName(name); })[0];
+      if (found) { found.qty += q; return; }
+      newItems.push({ name: name, unit: String(li.Unit || 'ชิ้น').trim() || 'ชิ้น', category: String(li.Category || 'อื่นๆ'), qty: q });
+      return;
+    }
+    const key = String(li.ItemID || '');
+    const item = inv.filter(function (x) { return String(x.ItemID) === key; })[0];
+    if (!item) throw Error('ไม่พบรายการพัสดุในคลัง');
+    agg[key] = (agg[key] || 0) + q;
   });
+
   const now = new Date();
   const req = String(p.Requester || '').trim();
   const dept = p.Department || '';
   const note = p.Note || '';
-  plan.forEach(function (row) {
-    update_('Inventory', 'ItemID', row.item.ItemID, { Quantity: row.next, UpdatedAt: now });
-    append_('Transactions', { TxnID: id_('TX'), Date: now, Type: type, ItemID: row.item.ItemID, Code: padCode_(row.item.Code), Name: row.item.Name, Quantity: row.q, Unit: row.item.Unit, Requester: req, Department: dept, Note: note, CreatedAt: now });
+  const result = [];
+
+  // 1) รายการที่มีอยู่ในคลังแล้ว
+  Object.keys(agg).forEach(function (k) {
+    const item = inv.filter(function (x) { return String(x.ItemID) === k; })[0];
+    const q = agg[k];
+    const cur = num_(item.Quantity);
+    if (type === 'OUT' && q > cur) throw Error(item.Name + ' คงเหลือไม่พอ (เหลือ ' + cur + ' ' + item.Unit + ')');
+    const next = type === 'IN' ? cur + q : cur - q;
+    update_('Inventory', 'ItemID', item.ItemID, { Quantity: next, UpdatedAt: now });
+    append_('Transactions', { TxnID: id_('TX'), Date: now, Type: type, ItemID: item.ItemID, Code: padCode_(item.Code), Name: item.Name, Quantity: q, Unit: item.Unit, Requester: req, Department: dept, Note: note, CreatedAt: now });
+    result.push({ Code: padCode_(item.Code), Name: item.Name, Quantity: q, Unit: item.Unit, Remaining: next, Created: false });
   });
-  return { saved: true, count: plan.length, type: type, items: plan.map(function (r) { return { Code: padCode_(r.item.Code), Name: r.item.Name, Quantity: r.q, Unit: r.item.Unit, Remaining: r.next }; }), data: getDashboard() };
+
+  // 2) รายการใหม่ (รับเข้า) — สร้างรหัสพัสดุให้อัตโนมัติ
+  if (newItems.length) {
+    let maxCode = 0;
+    rows_('Inventory').forEach(function (r) {
+      const m = String(r.Code || '').trim().match(/^0*(\d+)$/);
+      if (m) { const n = parseInt(m[1], 10); if (n > maxCode) maxCode = n; }
+    });
+    newItems.forEach(function (n) {
+      maxCode += 1;
+      const rec = { ItemID: id_('IT'), Code: padCode_(maxCode), Name: n.name, Category: n.category, Unit: n.unit, Quantity: n.qty, MinStock: 5, Price: 0, Location: '', Type: 'พัสดุ', Status: 'ใช้งาน', UpdatedAt: now, Notes: '' };
+      append_('Inventory', rec);
+      append_('Transactions', { TxnID: id_('TX'), Date: now, Type: 'IN', ItemID: rec.ItemID, Code: rec.Code, Name: rec.Name, Quantity: n.qty, Unit: rec.Unit, Requester: req, Department: dept, Note: note, CreatedAt: now });
+      result.push({ Code: rec.Code, Name: rec.Name, Quantity: n.qty, Unit: rec.Unit, Remaining: n.qty, Created: true });
+    });
+  }
+
+  return { saved: true, count: result.length, type: type, items: result, data: getDashboard() };
 }
 // บันทึกการเบิกหลายรายการพร้อมกัน (หน้าเบิกของ) — ตรวจสต็อกครบทุกรายการก่อนเขียนข้อมูล
 function recordWithdrawalBatch(p) {
