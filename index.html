@@ -46,7 +46,7 @@ body{
 
 /* ===== Header ===== */
 header{
-  position:relative;overflow:hidden;color:#fff;
+  position:relative;overflow:visible;color:#fff;
   background:linear-gradient(115deg,#3d0f06 0%,#6d2313 46%,#9c3d1d 100%);
   border-bottom:3px solid var(--amber);
   padding:22px max(18px,calc((100% - 1320px)/2));
@@ -89,6 +89,35 @@ header>*{position:relative;z-index:1}
   border-radius:11px;padding:9px 14px;font-size:13px;font-weight:600;box-shadow:none;
 }
 .top-actions button:hover,.top-actions a:hover{background:rgba(255,255,255,.24);transform:translateY(-1px)}
+.bellwrap{position:relative;display:inline-flex}
+.top-actions .bell{position:relative;padding:9px 12px;font-size:16px;line-height:1}
+.bellBadge{
+  position:absolute;top:-7px;right:-7px;min-width:19px;height:19px;padding:0 5px;
+  border-radius:999px;background:var(--amber);color:#3d0f06;border:2px solid #6d2313;
+  font-size:11px;font-weight:800;display:grid;place-items:center;line-height:1;
+}
+.bellBadge[hidden]{display:none}
+.belldrop{
+  position:absolute;top:calc(100% + 10px);right:0;z-index:70;width:min(390px,calc(100vw - 32px));
+  background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:16px;
+  box-shadow:0 28px 64px -22px rgba(23,32,51,.45);overflow:hidden;
+}
+.belldrop[hidden]{display:none}
+.bellhead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line)}
+.bellhead b{font-size:14px;color:#3a2a22}
+.bellhead span{font-size:11.5px;color:var(--muted)}
+.belllist{max-height:min(360px,60vh);overflow:auto}
+.bellrow{padding:11px 16px;border-bottom:1px solid #f4ede7;cursor:pointer}
+.bellrow:last-child{border-bottom:0}
+.bellrow:hover{background:#fffaf5}
+.bellrow .bt{font-size:12.5px;font-weight:700;color:#4a382f}
+.bellrow .bm{font-size:11.5px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bellrow .bellact{margin-top:8px}
+.bellrow .bellact button{padding:5px 10px;font-size:11.5px;border-radius:8px;background:linear-gradient(135deg,#1f7a4d,#0b5c37);box-shadow:none}
+.bellrow .bellact button:hover{transform:none;box-shadow:none}
+.bellfoot{padding:10px 16px;text-align:center;border-top:1px solid var(--line);background:#fdfaf7}
+.bellfoot a{font-size:12px;font-weight:700;color:var(--brand);text-decoration:none}
+.bellfoot a:hover{text-decoration:underline}
 
 /* ===== Layout ===== */
 .wrap{max-width:1320px;margin:0 auto;padding:22px 18px 52px}
@@ -268,7 +297,7 @@ textarea{resize:vertical;min-height:64px}
 .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .filters select,.filters input{width:auto;padding:7px 12px;font-size:12.5px;border-radius:999px;background:#fbf7f3}
 .filters input{min-width:230px}
-.hstats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.hstats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
 .hstat{background:linear-gradient(180deg,#fff8f2,#fff);border:1px solid var(--line);border-radius:12px;padding:10px 13px}
 .hstat span{display:block;font-size:11.5px;font-weight:600;color:var(--muted)}
 .hstat b{font-size:21px;font-weight:700;color:var(--brand-dark);line-height:1.3}
@@ -279,6 +308,7 @@ textarea{resize:vertical;min-height:64px}
 .hcard:hover{transform:translateY(-1px);box-shadow:0 14px 26px -22px rgba(84,24,12,.7)}
 .hcard.is-out{border-left-color:#c0392b;background:linear-gradient(180deg,#fff7f5,#fff)}
 .hcard.is-in{border-left-color:#1f7a4d;background:linear-gradient(180deg,#f6fcf8,#fff)}
+.hcard.is-received{border-left-color:#1f7a4d;background:linear-gradient(180deg,#f6fcf8,#fff)}
 .hcard-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .htag{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;background:#fdecea;color:#b42318;white-space:nowrap}
 .is-in .htag{background:#e9f6ee;color:#1f7a4d}
@@ -294,6 +324,27 @@ textarea{resize:vertical;min-height:64px}
 .hfoot{display:flex;gap:12px;align-items:center;border-top:1px dashed var(--line);padding-top:8px;font-size:11.5px;color:var(--muted)}
 .hfoot .hid{margin-left:auto;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10.5px;color:#b3a49a}
 .hmore{text-align:center;margin-top:14px}
+.hstatus{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:9px 0 8px;padding-top:8px;border-top:1px dashed var(--line)}
+.rbadge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.rbadge.pending{background:#fdf1dc;color:#a15c00}
+.rbadge.received{background:#e9f6ee;color:#1f7a4d}
+.hstatus .rbtn{padding:5px 10px;font-size:11.5px;border-radius:8px;background:linear-gradient(135deg,#1f7a4d,#0b5c37);box-shadow:none}
+.hstatus .rbtn:disabled{opacity:.6;cursor:default}
+.rby{font-size:10.5px;color:var(--muted)}
+.rlink{margin-left:auto;background:none;border:0;color:#a3948b;font-size:10.5px;font-weight:600;text-decoration:underline;padding:0;box-shadow:none}
+.rlink:hover{color:var(--brand);transform:none;box-shadow:none}
+
+/* ===== Toast ===== */
+.toast{
+  position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);z-index:130;
+  max-width:calc(100vw - 32px);padding:12px 20px;border-radius:12px;
+  background:#172033;color:#fff;font-size:13px;font-weight:600;text-align:center;
+  box-shadow:0 18px 40px -16px rgba(0,0,0,.6);opacity:0;pointer-events:none;
+  transition:opacity .2s ease,transform .2s ease;
+}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.toast.ok{background:#0b5c37}
+.toast.warn{background:#8a4b00}
 
 /* ===== Responsive ===== */
 @media(max-width:1100px){
@@ -323,6 +374,8 @@ textarea{resize:vertical;min-height:64px}
   .dbody{padding:14px 15px 18px}
   .dhead{padding:16px 15px 13px}
   .dtable{max-height:58vh}
+  .belldrop{position:fixed;left:12px;right:12px;top:auto;bottom:12px;width:auto;display:flex;flex-direction:column;max-height:calc(100vh - 24px)}
+  .belllist{max-height:none;flex:1 1 auto;min-height:0}
 }
 @media(max-width:420px){
   .kpis{grid-template-columns:1fr}
@@ -344,6 +397,16 @@ textarea{resize:vertical;min-height:64px}
   </div>
   <div class="top-actions">
     <span class="stamp"><i></i><span id="stamp">กำลังโหลดข้อมูล…</span></span>
+    <div class="bellwrap">
+      <button class="bell" id="bellBtn" type="button" onclick="toggleBell(event)" aria-label="การแจ้งเตือนรายการรอรับพัสดุ" aria-expanded="false" aria-haspopup="dialog">
+        🔔<span class="bellBadge" id="bellBadge" hidden>0</span>
+      </button>
+      <div class="belldrop" id="bellDrop" role="dialog" aria-label="รายการรอรับพัสดุ" hidden>
+        <div class="bellhead"><b>รอรับพัสดุ</b><span id="bellCount">กำลังโหลด…</span></div>
+        <div class="belllist" id="bellList"><div class="empty">กำลังโหลด…</div></div>
+        <div class="bellfoot"><a href="#historyPanel" onclick="closeBell()">ดูประวัติการเบิกทั้งหมด</a></div>
+      </div>
+    </div>
     <button onclick="load()">↻ รีเฟรช</button>
     <a href="withdraw.html" target="_blank" rel="noopener">🛒 หน้าเบิกพัสดุ</a>
   </div>
@@ -415,6 +478,11 @@ textarea{resize:vertical;min-height:64px}
           <option value="30" selected>30 วันล่าสุด</option>
           <option value="90">90 วันล่าสุด</option>
           <option value="0">ทั้งหมด</option>
+        </select>
+        <select id="hStatus" onchange="loadHistory()" aria-label="สถานะรับพัสดุ">
+          <option value="">ทุกสถานะ</option>
+          <option value="0">ยังไม่ได้รับพัสดุ</option>
+          <option value="1">รับพัสดุแล้ว</option>
         </select>
         <input id="hQuery" placeholder="🔍 ชื่อพัสดุ / ผู้เบิก / หน่วยงาน" oninput="queueHistory()" aria-label="ค้นหาประวัติ">
       </div>
@@ -490,6 +558,8 @@ textarea{resize:vertical;min-height:64px}
     </div>
   </div>
 </div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="config.js?v=15"></script><script>
 let D={inventory:[],assets:[],assetLoans:[],transactions:[]};const $=id=>document.getElementById(id);const esc=x=>String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));const API=window.API_URL||'';function call(fn,arg){const data=arg===undefined?null:arg;const read=['getDashboard','getItemList','getNextItemCode','getNextAssetCode','getTransactionHistory'].indexOf(fn)>=0;const p=read?apiGet(fn,data):apiPost(fn,data);return p.catch(e=>{alert(e.message||e);throw e})}function apiPost(fn,data){return fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:fn,data:data})}).then(r=>r.json()).then(j=>{if(!j.ok){const e=new Error(j.error||'เซิร์ฟเวอร์ขัดข้อง');e.biz=1;throw e}return j.result})}function apiGet(fn,data){const url=API+'?action='+encodeURIComponent(fn)+'&data='+encodeURIComponent(JSON.stringify(data));const one=()=>fetch(url).then(r=>r.json()).then(j=>{if(!j.ok){const e=new Error(j.error||'เซิร์ฟเวอร์ขัดข้อง');e.biz=1;throw e}return j.result});return one().catch(e=>{if(e&&e.biz)throw e;return jsonp(fn,data)})}function jsonp(fn,data){return new Promise((res,rej)=>{const cb='__apicb'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);const s=document.createElement('script');const clean=()=>{try{delete window[cb]}catch(_){window[cb]=undefined}s.remove()};window[cb]=j=>{clean();if(!j||!j.ok)rej(new Error(j&&j.error?j.error:'ข้อผิดพลาดจากเซิร์ฟเวอร์'));else res(j.result)};s.onerror=()=>{clean();rej(new Error('ติดต่อเซิร์ฟเวอร์ไม่ได้'))};s.src=API+'?callback='+cb+'&action='+encodeURIComponent(fn)+'&data='+encodeURIComponent(JSON.stringify(data));document.body.appendChild(s)})}function load(){call('getDashboard').then(d=>{D=d;render()})}function render(){const s=D.summary||{};$('items').textContent=s.items||0;$('qty').textContent=(s.quantity||0).toLocaleString();$('value').textContent=(s.value||0).toLocaleString(undefined,{maximumFractionDigits:2})+' ฿';$('assets').textContent=s.assets||0;$('low').textContent=s.low||0;renderInventory();renderAssets();renderLoans();$('lowTable').innerHTML=D.low?.length?'<table><tr><th>รายการ</th><th>เหลือ</th><th>ขั้นต่ำ</th></tr>'+D.low.map(x=>`<tr><td>${esc(x.Name)}</td><td class="red">${x.Quantity} ${esc(x.Unit)}</td><td>${x.MinStock}</td></tr>`).join('')+'</table>':'<div class="empty">ไม่มีรายการใกล้หมด</div>';let cs=D.categories||{},max=Math.max(1,...Object.values(cs));$('categories').innerHTML=Object.entries(cs).map(([k,v])=>`<div>${esc(k)} <b style="float:right">${v}</b><div class="bar"><i style="width:${v/max*100}%"></i></div></div>`).join('')||'<div class="empty">ยังไม่มีข้อมูล</div>'}function renderInventory(){let q=($('search').value||'').toLowerCase(),a=D.inventory.filter(x=>[x.Name,x.Code,x.Category].join(' ').toLowerCase().includes(q));$('inventoryTable').innerHTML=a.length?'<table><tr><th>รหัส</th><th>รายการ</th><th>หมวดหมู่</th><th>คงเหลือ</th><th>สถานที่</th><th></th></tr>'+a.map(x=>`<tr><td>${esc(x.Code)}</td><td><b>${esc(x.Name)}</b><br><span class="label">${esc(x.Type)}</span></td><td>${esc(x.Category)}</td><td>${x.Quantity} ${esc(x.Unit)} ${Number(x.Quantity)<=Number(x.MinStock)?'<span class="badge warn">ใกล้หมด</span>':''}</td><td>${esc(x.Location)}</td><td><button class="secondary" onclick='openItem(${JSON.stringify(x)})'>แก้ไข</button> <button class='danger' onclick="removeRecord('${x.ItemID||x.AssetID}')">ลบ</button></td></tr>`).join('')+'</table>':'<div class="empty">ไม่พบข้อมูล</div>'}function renderAssets(){$('assetTable').innerHTML=D.assets.length?'<table><tr><th>รหัสครุภัณฑ์</th><th>รายการ</th><th>หน่วยงาน</th><th>สถานที่</th><th>ผู้รับผิดชอบ</th><th>สถานะ</th><th></th></tr>'+D.assets.map(x=>{const actLoan=(D.assetLoans||[]).find(l=>String(l.AssetID)===String(x.AssetID)&&l.Status==='กำลังยืม');const badgeCls=x.Status==='ถูกยืม'||x.Status==='ชำรุด'?'badge warn':'badge';const loanBtn=x.Status==='ถูกยืม'&&actLoan?`<button onclick="openReturn('${actLoan.LoanID}')">รับคืน</button>`:(x.Status==='ใช้งาน'||!x.Status?`<button class="secondary" onclick="openLoan('${x.AssetID}')">ยืม</button>`:'');return `<tr><td><b>${esc(x.AssetCode)}</b></td><td>${esc(x.Name)}</td><td>${esc(x.Department)}</td><td>${esc(x.Location)}</td><td>${esc(x.Responsible)}</td><td><span class="${badgeCls}">${esc(x.Status||'ใช้งาน')}</span>${actLoan?`<br><small class="label">ผู้ยืม: ${esc(actLoan.Borrower)}</small>`:''}</td><td>${loanBtn} <button class="secondary" onclick='openAsset(${JSON.stringify(x)})'>แก้ไข</button> <button class='danger' onclick="removeRecord('${x.AssetID}')">ลบ</button></td></tr>`}).join('')+'</table>':'<div class="empty">ยังไม่มีข้อมูลครุภัณฑ์</div>'}function fmtDate(v){if(!v)return '-';const d=new Date(v);return isNaN(d)?esc(v):d.toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'})}function renderLoans(){const list=D.assetLoans||[];$('loanTable').innerHTML=list.length?'<table><tr><th>รหัส / ครุภัณฑ์</th><th>ผู้ยืม (หน่วยงาน)</th><th>นำไปใช้ในงาน</th><th>วันที่ยืม → กำหนดคืน</th><th>สภาพก่อนยืม</th><th>การคืน / สภาพหลังคืน</th><th>สถานะ</th><th></th></tr>'+list.map(x=>`<tr><td><b>${esc(x.AssetCode)}</b><br><span class="label">${esc(x.AssetName)}</span></td><td><b>${esc(x.Borrower)}</b>${x.Department?`<br><span class="label">${esc(x.Department)}</span>`:''}</td><td>${esc(x.Purpose)}</td><td>ยืม: ${fmtDate(x.BorrowDate)}<br>กำหนดคืน: ${fmtDate(x.DueDate)}${x.ReturnDate?`<br><b>คืนจริง: ${fmtDate(x.ReturnDate)}</b>`:''}</td><td>${esc(x.ConditionBefore||'-')}</td><td>${x.Status==='คืนแล้ว'?`<b>${esc(x.ReturnedComplete||'-')}</b><br><span class="label">สภาพ: ${esc(x.ConditionAfter||'-')}</span>`:'-'}${x.Note?`<br><small class="label">หมายเหตุ: ${esc(x.Note)}</small>`:''}</td><td><span class="${x.Status==='กำลังยืม'?'badge warn':'badge'}">${esc(x.Status)}</span></td><td>${x.Status==='กำลังยืม'?`<button onclick="openReturn('${x.LoanID}')">บันทึกคืน</button> `:''}<button class="danger" onclick="removeRecord('${x.LoanID}')">ลบ</button></td></tr>`).join('')+'</table>':'<div class="empty">ยังไม่มีประวัติการยืม–คืนครุภัณฑ์</div>'}
@@ -601,7 +671,8 @@ function txnSave(){if(txnType==='ADJUST'){call('recordTransaction',{ItemID:$('tI
       statsEl.innerHTML =
         '<div class="hstat"><span>ครั้งที่เบิก</span><b>' + fmt(s.out) + '</b> <small>ครั้ง</small></div>' +
         '<div class="hstat"><span>รายการที่เบิกไป</span><b>' + fmt(s.outItems) + '</b> <small>รายการ</small></div>' +
-        '<div class="hstat"><span>จำนวนชิ้นที่เบิก</span><b>' + fmt(s.outQty) + '</b> <small>ชิ้น</small></div>';
+        '<div class="hstat"><span>จำนวนชิ้นที่เบิก</span><b>' + fmt(s.outQty) + '</b> <small>ชิ้น</small></div>' +
+        '<div class="hstat"><span>รอรับพัสดุ</span><b>' + fmt(s.pending) + '</b> <small>รับแล้ว ' + fmt(s.received) + '</small></div>';
     }
     if (moreBtn) moreBtn.style.display = (r && r.hasMore) ? '' : 'none';
     if (!gs.length) {
@@ -614,11 +685,22 @@ function txnSave(){if(txnType==='ADJUST'){call('recordTransaction',{ItemID:$('tI
           '<em>×' + fmt(it.Quantity) + '</em><small>' + esc(it.Unit || '') + '</small></span>';
       }).join('');
       var cls = g.Type === 'OUT' ? 'is-out' : (g.Type === 'IN' ? 'is-in' : 'is-adj');
-      return '<article class="hcard ' + cls + '">' +
+      var statusHtml = '';
+      if (g.Type === 'OUT') {
+        var keyAttr = esc(g.Key);
+        statusHtml = g.Received
+          ? '<div class="hstatus"><span class="rbadge received">✓ รับพัสดุแล้ว</span>' +
+            (g.ReceivedBy ? '<span class="rby">โดย ' + esc(g.ReceivedBy) + '</span>' : '') +
+            '<button class="rlink" type="button" data-key="' + keyAttr + '" data-received="1">เปลี่ยนเป็นยังไม่ได้รับ</button></div>'
+          : '<div class="hstatus"><span class="rbadge pending">● ยังไม่ได้รับพัสดุ</span>' +
+            '<button class="rbtn" type="button" data-key="' + keyAttr + '" data-received="0">✓ รับพัสดุแล้ว</button></div>';
+      }
+      return '<article class="hcard ' + cls + (g.Type === 'OUT' && g.Received ? ' is-received' : '') + '">' +
         '<div class="hcard-top"><span class="htag">' + typeLabel(g.Type) + '</span><time>' + fmtDT(g.Date) + '</time></div>' +
         '<div class="hwho">👤 ' + esc(g.Requester || 'ไม่ระบุผู้เบิก') + (g.Department ? ' · ' + esc(g.Department) : '') + '</div>' +
         (g.Note ? '<div class="hnote">📝 ' + esc(g.Note) + '</div>' : '') +
         '<div class="hitems">' + items + '</div>' +
+        statusHtml +
         '<div class="hfoot"><span>' + (g.items || []).length + ' รายการ</span><span>รวม ' + fmt(g.totalQty) + ' ชิ้น</span>' +
         (g.BatchID ? '<span class="hid">#' + esc(String(g.BatchID).slice(-8)) + '</span>' : '') + '</div>' +
         '</article>';
@@ -634,6 +716,7 @@ function txnSave(){if(txnType==='ADJUST'){call('recordTransaction',{ItemID:$('tI
     var params = {
       Type: (document.getElementById('hType') || {}).value || '',
       Days: Number((document.getElementById('hDays') || {}).value || 0),
+      Received: (document.getElementById('hStatus') || {}).value || '',
       Query: (document.getElementById('hQuery') || {}).value || '',
       Limit: historyLimit
     };
@@ -658,6 +741,121 @@ function txnSave(){if(txnType==='ADJUST'){call('recordTransaction',{ItemID:$('tI
   window.loadHistory = loadHistory;
   window.queueHistory = queueHistory;
   window.loadMoreHistory = loadMoreHistory;
+
+  /* ===== Toast ===== */
+  var toastTimer = null;
+  function toast(msg, kind) {
+    var el = document.getElementById('toast');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = 'toast on' + (kind ? ' ' + kind : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.className = 'toast'; }, 3200);
+  }
+
+  /* ===== Withdrawal received status ===== */
+  function updateReceived(key, received, btn) {
+    if (!key) return;
+    if (btn) { btn.disabled = true; btn.textContent = 'กำลังบันทึก…'; }
+    call('setWithdrawalStatus', { Key: key, Received: received, By: 'ผู้ดูแลพัสดุ' }).then(function () {
+      toast(received ? '✓ อัปเดตสถานะ: รับพัสดุแล้ว' : 'อัปเดตสถานะ: ยังไม่ได้รับพัสดุ', received ? 'ok' : 'warn');
+      loadHistory();
+      loadBell();
+    }).catch(function () {}).then(function () {
+      if (btn) btn.disabled = false;
+    });
+  }
+
+  document.getElementById('historyList').addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('[data-key][data-received]') : null;
+    if (!btn) return;
+    e.preventDefault();
+    updateReceived(btn.getAttribute('data-key'), btn.getAttribute('data-received') === '0', btn);
+  });
+
+  /* ===== Notification bell (pending OUT batches, last 30 days) ===== */
+  var bellSeq = 0;
+
+  function loadBell() {
+    var seq = ++bellSeq;
+    apiGet('getTransactionHistory', { Type: 'OUT', Received: '0', Days: 30, Limit: 50 }).then(function (r) {
+      if (seq === bellSeq) renderBell(r);
+    }).catch(function () {});
+  }
+
+  function renderBell(r) {
+    var gs = (r && r.groups) || [];
+    var badge = document.getElementById('bellBadge');
+    var countEl = document.getElementById('bellCount');
+    var list = document.getElementById('bellList');
+    if (badge) {
+      badge.textContent = gs.length > 99 ? '99+' : String(gs.length);
+      badge.hidden = !gs.length;
+    }
+    if (countEl) countEl.textContent = gs.length ? gs.length + ' รายการรอรับ' : 'ไม่มีรายการรอรับ';
+    if (!list) return;
+    if (!gs.length) {
+      list.innerHTML = '<div class="empty">🎉 รับพัสดุครบทุกรายการแล้ว</div>';
+      return;
+    }
+    list.innerHTML = gs.slice(0, 20).map(function (g) {
+      var names = (g.items || []).map(function (it) { return it.Name; });
+      var shown = names.slice(0, 3).join(', ');
+      if (names.length > 3) shown += ' +' + (names.length - 3);
+      return '<div class="bellrow" data-focus-key="' + esc(g.Key) + '">' +
+        '<div class="bt">👤 ' + esc(g.Requester || 'ไม่ระบุผู้เบิก') + (g.Department ? ' · ' + esc(g.Department) : '') + '</div>' +
+        '<div class="bm">' + esc(shown) + ' · รวม ' + fmt(g.totalQty) + ' ชิ้น</div>' +
+        '<div class="bm">🕒 ' + fmtDT(g.Date) + '</div>' +
+        '<div class="bellact"><button type="button" data-key="' + esc(g.Key) + '" data-received="0">✓ รับพัสดุแล้ว</button></div>' +
+        '</div>';
+    }).join('');
+  }
+
+  function toggleBell(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    var drop = document.getElementById('bellDrop');
+    var btn = document.getElementById('bellBtn');
+    if (!drop) return;
+    var open = drop.hidden;
+    drop.hidden = !open;
+    if (btn) btn.setAttribute('aria-expanded', String(open));
+    if (open) loadBell();
+  }
+  function closeBell() {
+    var drop = document.getElementById('bellDrop');
+    var btn = document.getElementById('bellBtn');
+    if (drop) drop.hidden = true;
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  }
+  window.toggleBell = toggleBell;
+  window.closeBell = closeBell;
+
+  document.getElementById('bellList').addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('[data-key][data-received]') : null;
+    if (btn) {
+      e.preventDefault();
+      e.stopPropagation();
+      updateReceived(btn.getAttribute('data-key'), btn.getAttribute('data-received') === '0', btn);
+      return;
+    }
+    var row = e.target.closest ? e.target.closest('[data-focus-key]') : null;
+    if (row) {
+      closeBell();
+      var target = document.getElementById('historyPanel');
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+
+  document.addEventListener('click', function (e) {
+    var wrap = document.querySelector('.bellwrap');
+    if (wrap && !wrap.contains(e.target)) closeBell();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeBell();
+  });
+
+  loadBell();
+  setInterval(function () { if (document.visibilityState === 'visible') loadBell(); }, 45000);
 
   var base = render;
   render = function () { base.apply(null, arguments); draw(); loadHistory(); };

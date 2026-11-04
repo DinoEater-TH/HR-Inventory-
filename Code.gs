@@ -5,7 +5,7 @@ const SPREADSHEET_ID = '11voKZ1nFezcgt5Jz2SaBNs4-th7V7xrNKZ2fkz1Fsqo';
 const CATEGORIES = ['กระดาษ','อุปกรณ์เขียนและลบ','แฟ้มและซอง','อุปกรณ์หนีบและเย็บ','กาวและเทป','อุปกรณ์ตัดและวัด','ตรายางและหมึก','ไอทีและอิเล็กทรอนิกส์','สมุดและเบ็ดเตล็ด','อุปกรณ์จัดเก็บเอกสาร','อื่นๆ'];
 const TABLES = {
   Inventory: ['ItemID','Code','Name','Category','Unit','Quantity','MinStock','Price','Location','Type','Status','UpdatedAt','Notes'],
-  Transactions: ['TxnID','Date','Type','ItemID','Code','Name','Quantity','Unit','Requester','Department','Note','CreatedAt','BatchID'],
+  Transactions: ['TxnID','Date','Type','ItemID','Code','Name','Quantity','Unit','Requester','Department','Note','CreatedAt','BatchID','ReceivedStatus','ReceivedAt','ReceivedBy'],
   Assets: ['AssetID','AssetCode','Name','Category','Department','Location','Responsible','Status','PurchaseDate','Cost','Note','UpdatedAt'],
   AssetLoans: ['LoanID','AssetID','AssetCode','AssetName','Borrower','Department','Purpose','BorrowDate','DueDate','ConditionBefore','Status','ReturnDate','ReturnedComplete','ConditionAfter','Note','CreatedAt','UpdatedAt']
 };
@@ -52,6 +52,8 @@ function run_(action, data) {
   switch (action) {
     case 'getDashboard': return getDashboard();
     case 'getTransactionHistory': return getTransactionHistory(data || {});
+    case 'setWithdrawalStatus': return setWithdrawalStatus(data || {});
+    case 'getWithdrawalStatus': return getWithdrawalStatus(data || {});
     case 'getItemList': return getItemList();
     case 'getNextItemCode': return getNextItemCode();
     case 'getNextAssetCode': return getNextAssetCode();
@@ -136,6 +138,12 @@ function normalizeCodes_(table, key) {
 }
 function sheet_(n) { const s=ss_().getSheetByName(n); if(!s) throw Error('กรุณากด setup ก่อน'); return s; }
 function rows_(n) { const v=sheet_(n).getDataRange().getValues(); if(v.length<2)return []; return v.slice(1).map(r=>v[0].reduce((o,h,i)=>(o[h]=r[i],o),{})); }
+// คีย์ของรายการเบิก: ใช้ BatchID ถ้ามี ไม่งั้นใช้ เวลา+ประเภท+ผู้เบิก+หน่วยงาน+หมายเหตุ (ข้อมูลเก่า)
+function txnKey_(r, iso) {
+  const bid = String(r.BatchID || '').trim();
+  if (bid) return bid;
+  return [iso, r.Type, r.Requester, r.Department, r.Note].join('|');
+}
 function clean_(v) { return v instanceof Date ? v.toISOString() : (v==null?'':v); }
 function json_(v) { return JSON.parse(JSON.stringify(v,(_,x)=>clean_(x))); }
 function num_(v) { const n=Number(v); return isNaN(n)?0:n; }
@@ -163,6 +171,7 @@ function getTransactionHistory(p) {
   const fromTs = p.From ? new Date(String(p.From) + 'T00:00:00+07:00').getTime() : 0;
   const toTs = p.To ? new Date(String(p.To) + 'T23:59:59+07:00').getTime() : 0;
   const cutoff = days ? Date.now() - days * 86400000 : 0;
+  const receivedFilter = String(p.Received || '').trim();
 
   const groups = {};
   rows_('Transactions').forEach(function (r) {
@@ -170,6 +179,10 @@ function getTransactionHistory(p) {
     const ts = d.getTime();
     if (!ts || isNaN(ts)) return;
     if (type && String(r.Type || '').toUpperCase() !== type) return;
+    if (receivedFilter && String(r.Type || '').toUpperCase() !== 'OUT') return;
+    const isReceived = String(r.ReceivedStatus || '').toUpperCase() === 'RECEIVED';
+    if (receivedFilter === '0' && isReceived) return;
+    if (receivedFilter === '1' && !isReceived) return;
     if (cutoff && ts < cutoff) return;
     if (fromTs && ts < fromTs) return;
     if (toTs && ts > toTs) return;
@@ -182,22 +195,33 @@ function getTransactionHistory(p) {
     const key = String(r.BatchID || '').trim() || [iso, r.Type, r.Requester, r.Department, r.Note].join('|');
     if (!groups[key]) {
       groups[key] = {
+        Key: key,
         BatchID: String(r.BatchID || ''), Date: iso, Type: String(r.Type || '').toUpperCase(),
         Requester: String(r.Requester || ''), Department: String(r.Department || ''),
-        Note: String(r.Note || ''), items: [], totalQty: 0
+        Note: String(r.Note || ''), items: [], totalQty: 0,
+        Received: false, ReceivedAt: '', ReceivedBy: ''
       };
     }
     const g = groups[key];
     g.items.push({ Code: padCode_(r.Code), Name: String(r.Name || ''), Quantity: num_(r.Quantity), Unit: String(r.Unit || '') });
     g.totalQty += num_(r.Quantity);
+    if (isReceived) {
+      g.Received = true;
+      g.ReceivedBy = String(r.ReceivedBy || '');
+      const rd = r.ReceivedAt ? (r.ReceivedAt instanceof Date ? r.ReceivedAt : new Date(r.ReceivedAt)) : null;
+      if (rd && !isNaN(rd.getTime())) g.ReceivedAt = rd.toISOString();
+    }
   });
 
   const all = Object.keys(groups).map(function (k) { return groups[k]; })
     .sort(function (a, b) { return a.Date < b.Date ? 1 : (a.Date > b.Date ? -1 : 0); });
 
-  const stats = { events: all.length, out: 0, in: 0, outItems: 0, outQty: 0 };
+  const stats = { events: all.length, out: 0, in: 0, outItems: 0, outQty: 0, pending: 0, received: 0 };
   all.forEach(function (g) {
-    if (g.Type === 'OUT') { stats.out++; stats.outItems += g.items.length; stats.outQty += g.totalQty; }
+    if (g.Type === 'OUT') {
+      stats.out++; stats.outItems += g.items.length; stats.outQty += g.totalQty;
+      if (g.Received) stats.received++; else stats.pending++;
+    }
     else if (g.Type === 'IN') stats.in++;
   });
 
@@ -290,7 +314,7 @@ function recordBatch(p) {
     });
   }
 
-  return { saved: true, count: result.length, type: type, items: result, data: getDashboard() };
+  return { saved: true, count: result.length, type: type, items: result, batchId: batchId, data: getDashboard() };
 }
 // บันทึกการเบิกหลายรายการพร้อมกัน (หน้าเบิกของ) — ตรวจสต็อกครบทุกรายการก่อนเขียนข้อมูล
 function recordWithdrawalBatch(p) {
@@ -319,7 +343,89 @@ function recordWithdrawalBatch(p) {
     update_('Inventory', 'ItemID', row.item.ItemID, { Quantity: row.next, UpdatedAt: now });
     append_('Transactions', { TxnID: id_('TX'), Date: now, Type: 'OUT', ItemID: row.item.ItemID, Code: padCode_(row.item.Code), Name: row.item.Name, Quantity: row.q, Unit: row.item.Unit, Requester: req, Department: dept, Note: note, CreatedAt: now, BatchID: batchId });
   });
-  return { saved: true, count: plan.length, receipt: plan.map(function (r) { return { Code: padCode_(r.item.Code), Name: r.item.Name, Quantity: r.q, Unit: r.item.Unit, Remaining: r.next }; }), data: getItemList() };
+  return { saved: true, count: plan.length, batchId: batchId, receipt: plan.map(function (r) { return { Code: padCode_(r.item.Code), Name: r.item.Name, Quantity: r.q, Unit: r.item.Unit, Remaining: r.next }; }), data: getItemList() };
+}
+// ปรับสถานะการรับพัสดุของรายการเบิกทั้งชุด (ทุกแถวที่มี BatchID / คีย์เดียวกัน)
+function setWithdrawalStatus(p) {
+  setup();
+  p = p || {};
+  const key = String(p.Key || p.key || '').trim();
+  if (!key) throw Error('ไม่พบรหัสรายการเบิก');
+  const on = (function () {
+    if (p.Received === true) return true;
+    if (p.Received === false || p.Received === null || p.Received === undefined) return false;
+    const rv = String(p.Received).trim().toUpperCase();
+    return rv === '1' || rv === 'TRUE' || rv === 'RECEIVED' || rv === 'YES';
+  })();
+  const by = String(p.By || p.ReceivedBy || '').trim();
+  const now = new Date();
+  const sheet = sheet_('Transactions');
+  const v = sheet.getDataRange().getValues();
+  if (v.length < 2) throw Error('ไม่พบรายการเบิก');
+  const h = v[0];
+  const cStatus = h.indexOf('ReceivedStatus'), cAt = h.indexOf('ReceivedAt'), cBy = h.indexOf('ReceivedBy');
+  if (cStatus < 0) throw Error('กรุณากด setup ก่อน');
+  const updates = [];
+  let batchId = '', isoOut = '';
+  for (let i = 1; i < v.length; i++) {
+    const r = h.reduce(function (o, hh, j) { o[hh] = v[i][j]; return o; }, {});
+    const d = r.Date instanceof Date ? r.Date : new Date(r.Date);
+    if (!d || isNaN(d.getTime())) continue;
+    const iso = d.toISOString();
+    if (txnKey_(r, iso) !== key) continue;
+    if (String(r.Type || '').toUpperCase() !== 'OUT') continue;
+    updates.push(i + 1);
+    if (!batchId) batchId = String(r.BatchID || '');
+    if (!isoOut) isoOut = iso;
+  }
+  if (!updates.length) throw Error('ไม่พบรายการเบิกที่ต้องการปรับสถานะ');
+  updates.forEach(function (row) {
+    sheet.getRange(row, cStatus + 1).setValue(on ? 'RECEIVED' : '');
+    if (cAt >= 0) sheet.getRange(row, cAt + 1).setValue(on ? now : '');
+    if (cBy >= 0) sheet.getRange(row, cBy + 1).setValue(on ? by : '');
+  });
+  return { saved: true, Key: key, BatchID: batchId, Date: isoOut, Received: on, ReceivedAt: on ? now.toISOString() : '', ReceivedBy: on ? by : '', count: updates.length };
+}
+// สถานะการรับพัสดุสำหรับผู้เบิก (เรียกซ้ำเป็นระยะเพื่ออัปเดตแบบใกล้เวลาจริง)
+function getWithdrawalStatus(p) {
+  setup();
+  p = p || {};
+  let keys = p.Keys || p.keys || p.BatchIDs || p.BatchID || [];
+  if (typeof keys === 'string') keys = keys.split(',');
+  if (!Array.isArray(keys)) keys = [];
+  keys = keys.map(function (k) { return String(k || '').trim(); }).filter(Boolean).slice(0, 100);
+  const want = {};
+  keys.forEach(function (k) { want[k] = true; });
+  const map = {};
+  rows_('Transactions').forEach(function (r) {
+    const d = r.Date instanceof Date ? r.Date : new Date(r.Date);
+    if (!d || isNaN(d.getTime())) return;
+    if (String(r.Type || '').toUpperCase() !== 'OUT') return;
+    const iso = d.toISOString();
+    const k = txnKey_(r, iso);
+    if (keys.length && !want[k]) return;
+    if (!map[k]) {
+      map[k] = {
+        Key: k, BatchID: String(r.BatchID || ''), Date: iso,
+        Requester: String(r.Requester || ''), Department: String(r.Department || ''), Note: String(r.Note || ''),
+        Received: false, ReceivedAt: '', ReceivedBy: '', items: 0, totalQty: 0
+      };
+    }
+    const g = map[k];
+    g.items++;
+    g.totalQty += num_(r.Quantity);
+    if (String(r.ReceivedStatus || '').toUpperCase() === 'RECEIVED') {
+      g.Received = true;
+      g.ReceivedBy = String(r.ReceivedBy || '');
+      const rd = r.ReceivedAt ? (r.ReceivedAt instanceof Date ? r.ReceivedAt : new Date(r.ReceivedAt)) : null;
+      if (rd && !isNaN(rd.getTime())) g.ReceivedAt = rd.toISOString();
+    }
+  });
+  const batches = Object.keys(map).map(function (k) { return map[k]; })
+    .sort(function (a, b) { return a.Date < b.Date ? 1 : (a.Date > b.Date ? -1 : 0); })
+    .slice(0, 100);
+  const pending = batches.filter(function (b) { return !b.Received; }).length;
+  return { batches: batches, total: batches.length, pending: pending, received: batches.length - pending };
 }
 // ข้อมูลแบบเบาสำหรับหน้าเบิกของ (ไม่เปิดเผยข้อมูลจัดการคลัง)
 function getItemList() {
