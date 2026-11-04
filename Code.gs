@@ -3,6 +3,8 @@
  */
 const SPREADSHEET_ID = '11voKZ1nFezcgt5Jz2SaBNs4-th7V7xrNKZ2fkz1Fsqo';
 const CATEGORIES = ['กระดาษ','อุปกรณ์เขียนและลบ','แฟ้มและซอง','อุปกรณ์หนีบและเย็บ','กาวและเทป','อุปกรณ์ตัดและวัด','ตรายางและหมึก','ไอทีและอิเล็กทรอนิกส์','สมุดและเบ็ดเตล็ด','อุปกรณ์จัดเก็บเอกสาร','อื่นๆ'];
+// สถานะครุภัณฑ์ที่อนุญาต (ต้องมีแค่ 4 ค่านี้เท่านั้น)
+const ASSET_STATUSES = ['ว่าง','ยืม','ชำรุด','จำหน่าย'];
 const TABLES = {
   Inventory: ['ItemID','Code','Name','Category','Unit','Quantity','MinStock','Price','Location','Type','Status','UpdatedAt','Notes'],
   Transactions: ['TxnID','Date','Type','ItemID','Code','Name','Quantity','Unit','Requester','Department','Note','CreatedAt','BatchID','ReceivedStatus','ReceivedAt','ReceivedBy'],
@@ -103,6 +105,7 @@ function setup() {
   if (!book.getSheetByName('Settings')) { const s=book.insertSheet('Settings'); s.appendRow(['Key','Value']); s.appendRow(['LowStockDefault','5']); }
   importExisting_();
   normalizeCodes_('Inventory','Code');
+  normalizeAssetStatuses_();
   const assetSheet = sheet_('Assets');
   assetSheet.getRange(2, 2, Math.max(1, assetSheet.getMaxRows() - 1), 1).setNumberFormat('@');
   return 'พร้อมใช้งาน';
@@ -118,6 +121,28 @@ function ensureHeaders_(name) {
   const startCol = have.filter(function (x) { return x; }).length + 1;
   s.getRange(1, startCol, 1, missing.length).setValues([missing]);
   s.setFrozenRows(1);
+}
+// แปลงสถานะครุภัณฑ์เดิมให้เป็นชุดค่ามาตรฐาน 4 ค่า (ใช้งาน/ถูกยืม คือข้อมูลเก่า)
+function assetStatus_(v) {
+  const s = String(v || '').trim();
+  if (s === 'ถูกยืม') return 'ยืม';
+  if (s === 'ใช้งาน' || !s) return 'ว่าง';
+  return ASSET_STATUSES.indexOf(s) >= 0 ? s : 'ว่าง';
+}
+// อัปเดตข้อมูลเดิมในชีตให้เป็นสถานะมาตรฐาน (เรียกตอน setup)
+function normalizeAssetStatuses_() {
+  const s = sheet_('Assets'), last = s.getLastRow();
+  if (last < 2) return;
+  const col = TABLES.Assets.indexOf('Status') + 1;
+  if (col < 1) return;
+  const rng = s.getRange(2, col, last - 1, 1), vals = rng.getValues();
+  let changed = false;
+  const next = vals.map(function (r) {
+    const v = assetStatus_(r[0]);
+    if (v !== String(r[0] || '').trim()) changed = true;
+    return [v];
+  });
+  if (changed) rng.setValues(next);
 }
 function normalizeCodes_(table, key) {
   const s=sheet_(table), last=s.getLastRow();
@@ -443,7 +468,10 @@ function saveAsset(a) {
   if(!name)throw Error('กรุณาระบุชื่อครุภัณฑ์');
   const dup=rows_('Assets').find(x=>String(x.AssetCode||'').trim()===code && String(x.AssetID)!==String(a.AssetID||''));
   if(dup)throw Error('รหัสครุภัณฑ์นี้มีอยู่ในระบบแล้ว: '+code);
-  const o={AssetID:a.AssetID||id_('AS'),AssetCode:code,Name:name,Category:a.Category||'ครุภัณฑ์สำนักงาน',Department:a.Department||'',Location:a.Location||'',Responsible:a.Responsible||'',Status:a.Status||'ใช้งาน',PurchaseDate:a.PurchaseDate?new Date(a.PurchaseDate):'',Cost:num_(a.Cost),Note:a.Note||'',UpdatedAt:new Date()};
+  const rawStatus=String(a.Status||'').trim();
+  if(rawStatus && rawStatus!=='ใช้งาน' && rawStatus!=='ถูกยืม' && ASSET_STATUSES.indexOf(rawStatus)<0)
+    throw Error('สถานะครุภัณฑ์ต้องเป็นหนึ่งใน: '+ASSET_STATUSES.join(', '));
+  const o={AssetID:a.AssetID||id_('AS'),AssetCode:code,Name:name,Category:a.Category||'ครุภัณฑ์สำนักงาน',Department:a.Department||'',Location:a.Location||'',Responsible:a.Responsible||'',Status:assetStatus_(rawStatus),PurchaseDate:a.PurchaseDate?new Date(a.PurchaseDate):'',Cost:num_(a.Cost),Note:a.Note||'',UpdatedAt:new Date()};
   if(a.AssetID)update_('Assets','AssetID',a.AssetID,o);else append_('Assets',o);
   return getDashboard();
 }
@@ -451,8 +479,9 @@ function borrowAsset(p) {
   setup();
   const asset=rows_('Assets').find(x=>String(x.AssetID)===String(p.AssetID));
   if(!asset)throw Error('ไม่พบข้อมูลครุภัณฑ์');
-  if(String(asset.Status||'')==='ถูกยืม')throw Error('ครุภัณฑ์ชิ้นนี้กำลังถูกยืมอยู่ กรุณาบันทึกคืนก่อน');
-  if(String(asset.Status||'')==='ชำรุด'||String(asset.Status||'')==='จำหน่าย')throw Error('ครุภัณฑ์สถานะ '+asset.Status+' ไม่สามารถยืมได้');
+  const curStatus=assetStatus_(asset.Status);
+  if(curStatus==='ยืม')throw Error('ครุภัณฑ์ชิ้นนี้กำลังถูกยืมอยู่ กรุณาบันทึกคืนก่อน');
+  if(curStatus==='ชำรุด'||curStatus==='จำหน่าย')throw Error('ครุภัณฑ์สถานะ '+curStatus+' ไม่สามารถยืมได้');
   const borrower=String(p.Borrower||'').trim();
   if(!borrower)throw Error('กรุณาระบุชื่อผู้ยืม');
   const borrowDate=String(p.BorrowDate||'').trim();
@@ -483,7 +512,7 @@ function borrowAsset(p) {
     UpdatedAt:now
   };
   append_('AssetLoans',loan);
-  update_('Assets','AssetID',asset.AssetID,{Status:'ถูกยืม',UpdatedAt:now});
+  update_('Assets','AssetID',asset.AssetID,{Status:'ยืม',UpdatedAt:now});
   return getDashboard();
 }
 function returnAsset(p) {
@@ -503,7 +532,7 @@ function returnAsset(p) {
     Note:p.Note!==undefined?p.Note:(loan.Note||''),
     UpdatedAt:now
   });
-  const nextStatus = condAfter.indexOf('ชำรุด')>=0 ? 'ชำรุด' : 'ใช้งาน';
+  const nextStatus = condAfter.indexOf('ชำรุด')>=0 ? 'ชำรุด' : 'ว่าง';
   try { update_('Assets','AssetID',loan.AssetID,{Status:nextStatus,UpdatedAt:now}); } catch(_){}
   return getDashboard();
 }
@@ -514,7 +543,7 @@ function deleteAssetLoan(id) {
   if(r<0)throw Error('ไม่พบข้อมูลการยืม');
   sheet_('AssetLoans').deleteRow(r);
   if(loan && String(loan.Status)==='กำลังยืม') {
-    try { update_('Assets','AssetID',loan.AssetID,{Status:'ใช้งาน',UpdatedAt:new Date()}); } catch(_){}
+    try { update_('Assets','AssetID',loan.AssetID,{Status:'ว่าง',UpdatedAt:new Date()}); } catch(_){}
   }
   return getDashboard();
 }
