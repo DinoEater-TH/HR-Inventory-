@@ -5,7 +5,7 @@ const SPREADSHEET_ID = '11voKZ1nFezcgt5Jz2SaBNs4-th7V7xrNKZ2fkz1Fsqo';
 const CATEGORIES = ['กระดาษ','อุปกรณ์เขียนและลบ','แฟ้มและซอง','อุปกรณ์หนีบและเย็บ','กาวและเทป','อุปกรณ์ตัดและวัด','ตรายางและหมึก','ไอทีและอิเล็กทรอนิกส์','สมุดและเบ็ดเตล็ด','อุปกรณ์จัดเก็บเอกสาร','อื่นๆ'];
 const TABLES = {
   Inventory: ['ItemID','Code','Name','Category','Unit','Quantity','MinStock','Price','Location','Type','Status','UpdatedAt','Notes'],
-  Transactions: ['TxnID','Date','Type','ItemID','Code','Name','Quantity','Unit','Requester','Department','Note','CreatedAt'],
+  Transactions: ['TxnID','Date','Type','ItemID','Code','Name','Quantity','Unit','Requester','Department','Note','CreatedAt','BatchID'],
   Assets: ['AssetID','AssetCode','Name','Category','Department','Location','Responsible','Status','PurchaseDate','Cost','Note','UpdatedAt'],
   AssetLoans: ['LoanID','AssetID','AssetCode','AssetName','Borrower','Department','Purpose','BorrowDate','DueDate','ConditionBefore','Status','ReturnDate','ReturnedComplete','ConditionAfter','Note','CreatedAt','UpdatedAt']
 };
@@ -51,6 +51,7 @@ function handle_(req) {
 function run_(action, data) {
   switch (action) {
     case 'getDashboard': return getDashboard();
+    case 'getTransactionHistory': return getTransactionHistory(data || {});
     case 'getItemList': return getItemList();
     case 'getNextItemCode': return getNextItemCode();
     case 'getNextAssetCode': return getNextAssetCode();
@@ -96,12 +97,25 @@ function setup() {
   // ตั้ง time zone ของสเปรดชีตเป็นกรุงเทพฯ เพื่อให้เวลาที่แสดงในชีตตรงกับเวลาจริง (กันชีตแสดงเป็น UTC)
   if (String(book.getSpreadsheetTimeZone()||'') !== 'Asia/Bangkok') book.setSpreadsheetTimeZone('Asia/Bangkok');
   Object.keys(TABLES).forEach(n => { let s=book.getSheetByName(n); if(!s) s=book.insertSheet(n); if(s.getLastRow()===0) s.appendRow(TABLES[n]); s.setFrozenRows(1); });
+  Object.keys(TABLES).forEach(n => ensureHeaders_(n));
   if (!book.getSheetByName('Settings')) { const s=book.insertSheet('Settings'); s.appendRow(['Key','Value']); s.appendRow(['LowStockDefault','5']); }
   importExisting_();
   normalizeCodes_('Inventory','Code');
   const assetSheet = sheet_('Assets');
   assetSheet.getRange(2, 2, Math.max(1, assetSheet.getMaxRows() - 1), 1).setNumberFormat('@');
   return 'พร้อมใช้งาน';
+}
+// เพิ่มคอลัมน์หัวตารางที่ยังไม่มี (รองรับชีตเดิมที่สร้างไว้ก่อนเพิ่มฟิลด์ใหม่)
+function ensureHeaders_(name) {
+  const s = sheet_(name);
+  const want = TABLES[name];
+  const lastCol = Math.max(1, s.getLastColumn());
+  const have = s.getRange(1, 1, 1, lastCol).getValues()[0].map(function (x) { return String(x || '').trim(); });
+  const missing = want.filter(function (h) { return have.indexOf(h) < 0; });
+  if (!missing.length) return;
+  const startCol = have.filter(function (x) { return x; }).length + 1;
+  s.getRange(1, startCol, 1, missing.length).setValues([missing]);
+  s.setFrozenRows(1);
 }
 function normalizeCodes_(table, key) {
   const s=sheet_(table), last=s.getLastRow();
@@ -138,6 +152,57 @@ function getDashboard() {
   const cats={}; inventory.forEach(x=>cats[x.Category||'ไม่ระบุ']=(cats[x.Category||'ไม่ระบุ']||0)+num_(x.Quantity));
   return json_({inventory,assets,assetLoans,transactions:tx.slice(-100).reverse(),low,categories:cats,nextItemCode:nextCode_(inventory,'Code'),summary:{items:inventory.length,quantity:totalQty,value:totalValue,assets:assets.length,low:low.length}});
 }
+// ประวัติการเบิก–รับเข้า: จัดกลุ่มเป็น "ครั้ง/ใบ" พร้อมรายการพัสดุในแต่ละครั้ง
+function getTransactionHistory(p) {
+  setup();
+  p = p || {};
+  const type = String(p.Type || '').toUpperCase();
+  const query = String(p.Query || '').trim().toLowerCase();
+  const days = Math.max(0, num_(p.Days));
+  const limit = Math.min(500, Math.max(1, num_(p.Limit) || 50));
+  const fromTs = p.From ? new Date(String(p.From) + 'T00:00:00+07:00').getTime() : 0;
+  const toTs = p.To ? new Date(String(p.To) + 'T23:59:59+07:00').getTime() : 0;
+  const cutoff = days ? Date.now() - days * 86400000 : 0;
+
+  const groups = {};
+  rows_('Transactions').forEach(function (r) {
+    const d = r.Date instanceof Date ? r.Date : new Date(r.Date);
+    const ts = d.getTime();
+    if (!ts || isNaN(ts)) return;
+    if (type && String(r.Type || '').toUpperCase() !== type) return;
+    if (cutoff && ts < cutoff) return;
+    if (fromTs && ts < fromTs) return;
+    if (toTs && ts > toTs) return;
+    if (query) {
+      const hay = [r.Name, r.Code, r.Requester, r.Department, r.Note, r.TxnID, r.BatchID].join(' ').toLowerCase();
+      if (hay.indexOf(query) < 0) return;
+    }
+    const iso = d.toISOString();
+    // แถวที่บันทึกพร้อมกันจะได้ BatchID เดียวกัน (ข้อมูลเก่าที่ไม่มี BatchID ใช้เวลา+ผู้เบิก+หน่วยงานจัดกลุ่มแทน)
+    const key = String(r.BatchID || '').trim() || [iso, r.Type, r.Requester, r.Department, r.Note].join('|');
+    if (!groups[key]) {
+      groups[key] = {
+        BatchID: String(r.BatchID || ''), Date: iso, Type: String(r.Type || '').toUpperCase(),
+        Requester: String(r.Requester || ''), Department: String(r.Department || ''),
+        Note: String(r.Note || ''), items: [], totalQty: 0
+      };
+    }
+    const g = groups[key];
+    g.items.push({ Code: padCode_(r.Code), Name: String(r.Name || ''), Quantity: num_(r.Quantity), Unit: String(r.Unit || '') });
+    g.totalQty += num_(r.Quantity);
+  });
+
+  const all = Object.keys(groups).map(function (k) { return groups[k]; })
+    .sort(function (a, b) { return a.Date < b.Date ? 1 : (a.Date > b.Date ? -1 : 0); });
+
+  const stats = { events: all.length, out: 0, in: 0, outItems: 0, outQty: 0 };
+  all.forEach(function (g) {
+    if (g.Type === 'OUT') { stats.out++; stats.outItems += g.items.length; stats.outQty += g.totalQty; }
+    else if (g.Type === 'IN') stats.in++;
+  });
+
+  return json_({ groups: all.slice(0, limit), total: all.length, stats: stats, hasMore: all.length > limit, limit: limit });
+}
 function getNextItemCode() { setup(); return nextCode_(rows_('Inventory'),'Code'); }
 function saveItem(item) {
   setup(); const now=new Date();
@@ -151,7 +216,7 @@ function recordTransaction(t) {
   const q=num_(t.Quantity); if(q<=0)throw Error('จำนวนต้องมากกว่า 0'); const type=String(t.Type||'IN').toUpperCase(); let next=num_(item.Quantity);
   if(type==='OUT'){if(q>next)throw Error('จำนวนคงเหลือไม่พอ');next-=q;}else if(type==='IN')next+=q;else if(type==='ADJUST')next=q;else throw Error('ประเภทรายการไม่ถูกต้อง');
   update_('Inventory','ItemID',item.ItemID,{Quantity:next,UpdatedAt:new Date()});
-  append_('Transactions',{TxnID:id_('TX'),Date:t.Date?new Date(t.Date):new Date(),Type:type,ItemID:item.ItemID,Code:padCode_(item.Code),Name:item.Name,Quantity:q,Unit:item.Unit,Requester:t.Requester||'',Department:t.Department||'',Note:t.Note||'',CreatedAt:new Date()});
+  append_('Transactions',{TxnID:id_('TX'),BatchID:id_('BX'),Date:t.Date?new Date(t.Date):new Date(),Type:type,ItemID:item.ItemID,Code:padCode_(item.Code),Name:item.Name,Quantity:q,Unit:item.Unit,Requester:t.Requester||'',Department:t.Department||'',Note:t.Note||'',CreatedAt:new Date()});
   return t.light ? { saved: true, name: item.Name, remaining: next, unit: item.Unit, data: getItemList() } : getDashboard();
 }
 // บันทึกรับเข้า/เบิกออกหลายรายการพร้อมกัน (แดชบอร์ด) — ตรวจครบทุกรายการก่อนเขียนข้อมูล
@@ -191,6 +256,7 @@ function recordBatch(p) {
   });
 
   const now = new Date();
+  const batchId = id_('BX');
   const req = String(p.Requester || '').trim();
   const dept = p.Department || '';
   const note = p.Note || '';
@@ -204,7 +270,7 @@ function recordBatch(p) {
     if (type === 'OUT' && q > cur) throw Error(item.Name + ' คงเหลือไม่พอ (เหลือ ' + cur + ' ' + item.Unit + ')');
     const next = type === 'IN' ? cur + q : cur - q;
     update_('Inventory', 'ItemID', item.ItemID, { Quantity: next, UpdatedAt: now });
-    append_('Transactions', { TxnID: id_('TX'), Date: now, Type: type, ItemID: item.ItemID, Code: padCode_(item.Code), Name: item.Name, Quantity: q, Unit: item.Unit, Requester: req, Department: dept, Note: note, CreatedAt: now });
+    append_('Transactions', { TxnID: id_('TX'), Date: now, Type: type, ItemID: item.ItemID, Code: padCode_(item.Code), Name: item.Name, Quantity: q, Unit: item.Unit, Requester: req, Department: dept, Note: note, CreatedAt: now, BatchID: batchId });
     result.push({ Code: padCode_(item.Code), Name: item.Name, Quantity: q, Unit: item.Unit, Remaining: next, Created: false });
   });
 
@@ -219,7 +285,7 @@ function recordBatch(p) {
       maxCode += 1;
       const rec = { ItemID: id_('IT'), Code: padCode_(maxCode), Name: n.name, Category: n.category, Unit: n.unit, Quantity: n.qty, MinStock: 5, Price: 0, Location: '', Type: 'พัสดุ', Status: 'ใช้งาน', UpdatedAt: now, Notes: '' };
       append_('Inventory', rec);
-      append_('Transactions', { TxnID: id_('TX'), Date: now, Type: 'IN', ItemID: rec.ItemID, Code: rec.Code, Name: rec.Name, Quantity: n.qty, Unit: rec.Unit, Requester: req, Department: dept, Note: note, CreatedAt: now });
+      append_('Transactions', { TxnID: id_('TX'), Date: now, Type: 'IN', ItemID: rec.ItemID, Code: rec.Code, Name: rec.Name, Quantity: n.qty, Unit: rec.Unit, Requester: req, Department: dept, Note: note, CreatedAt: now, BatchID: batchId });
       result.push({ Code: rec.Code, Name: rec.Name, Quantity: n.qty, Unit: rec.Unit, Remaining: n.qty, Created: true });
     });
   }
@@ -245,12 +311,13 @@ function recordWithdrawalBatch(p) {
     return { item: item, q: q, next: cur - q };
   });
   const now = new Date();
+  const batchId = id_('BX');
   const req = String(p.Requester || '').trim();
   const dept = p.Department || '';
   const note = p.Note || '';
   plan.forEach(function (row) {
     update_('Inventory', 'ItemID', row.item.ItemID, { Quantity: row.next, UpdatedAt: now });
-    append_('Transactions', { TxnID: id_('TX'), Date: now, Type: 'OUT', ItemID: row.item.ItemID, Code: padCode_(row.item.Code), Name: row.item.Name, Quantity: row.q, Unit: row.item.Unit, Requester: req, Department: dept, Note: note, CreatedAt: now });
+    append_('Transactions', { TxnID: id_('TX'), Date: now, Type: 'OUT', ItemID: row.item.ItemID, Code: padCode_(row.item.Code), Name: row.item.Name, Quantity: row.q, Unit: row.item.Unit, Requester: req, Department: dept, Note: note, CreatedAt: now, BatchID: batchId });
   });
   return { saved: true, count: plan.length, receipt: plan.map(function (r) { return { Code: padCode_(r.item.Code), Name: r.item.Name, Quantity: r.q, Unit: r.item.Unit, Remaining: r.next }; }), data: getItemList() };
 }
