@@ -123,6 +123,13 @@ header>*{position:relative;z-index:1}
 .kpi .v{display:block;font-size:26px;font-weight:700;letter-spacing:-.4px;line-height:1.25;margin-top:2px}
 .kpi .s{display:block;font-size:11.5px;color:#a3948b;margin-top:2px}
 .kpi.hot .v{color:var(--danger)}
+.kpi.clickable{cursor:pointer;text-align:left;font-family:inherit;color:inherit}
+.kpi.clickable::after{
+  content:'ดูทั้งหมด →';position:absolute;top:14px;right:15px;font-size:10.5px;font-weight:700;
+  letter-spacing:.1px;color:var(--accent,#b44830);opacity:.55;transition:opacity .18s,transform .18s;
+}
+.kpi.clickable:hover::after,.kpi.clickable:focus-visible::after{opacity:1;transform:translateX(2px)}
+.kpi.clickable:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(240,156,24,.45),0 22px 44px -30px rgba(84,24,12,.7);transform:translateY(-3px)}
 
 /* ===== Charts ===== */
 .charts{display:grid;grid-template-columns:1.05fr 1.25fr .95fr;gap:16px;margin-top:16px}
@@ -172,6 +179,7 @@ table tr:hover td{background:#fffaf5}
 /* ===== Badges / misc ===== */
 .badge{display:inline-block;background:#e9f6ee;color:var(--ok);padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap}
 .badge.warn{background:#fdf1dc;color:var(--warn)}
+.badge.danger{background:#fdecea;color:var(--danger)}
 .label{font-size:11.5px;color:var(--muted)}
 .red{color:var(--danger)}
 .empty{padding:28px 14px;text-align:center;color:var(--muted);font-size:13px}
@@ -235,6 +243,27 @@ textarea{resize:vertical;min-height:64px}
 .form label input,.form label select,.form label textarea{margin-top:4px;font-weight:400;color:var(--ink)}
 .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
 
+/* ===== Detail dialog (KPI drill-down) ===== */
+.dialog.wide{max-width:1000px;padding:0;overflow:hidden;display:flex;flex-direction:column;max-height:90vh}
+.dhead{display:flex;align-items:flex-start;gap:12px;padding:20px 22px 15px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#fff8f2,#fff)}
+.dhead h2{margin:0;font-size:19px;color:#3a2a22}
+.dhead p{margin:3px 0 0;font-size:12.5px;color:var(--muted)}
+.dclose{margin-left:auto;flex:0 0 auto;width:34px;height:34px;padding:0;display:grid;place-items:center;border-radius:10px;background:#f6efe9;color:#6b5548;border:1px solid var(--line);font-size:14px;line-height:1;box-shadow:none}
+.dclose:hover{background:#efe3d9;transform:none;box-shadow:none}
+.dbody{padding:16px 22px 22px;overflow:auto}
+.dsum{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.dsearch{position:relative;margin-bottom:12px}
+.dsearch input{padding-left:34px;border-radius:999px;background:#fbf7f3}
+.dsearch::before{content:'🔍';position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;opacity:.75;pointer-events:none}
+.dtable{overflow:auto;border:1px solid var(--line);border-radius:14px;max-height:52vh}
+.dtable table{min-width:100%}
+.dtable th{background:#fbf7f3}
+.dtable td{white-space:nowrap}
+.dtable td.wrap{white-space:normal;min-width:180px}
+.dtable .muted{color:var(--muted);font-size:12px}
+.dtable .num{text-align:right;font-variant-numeric:tabular-nums}
+.dtable .empty{border:0;border-radius:0}
+
 /* ===== History ===== */
 .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .filters select,.filters input{width:auto;padding:7px 12px;font-size:12.5px;border-radius:999px;background:#fbf7f3}
@@ -290,6 +319,10 @@ textarea{resize:vertical;min-height:64px}
   .filters{width:100%}
   .filters input{min-width:0;width:100%}
   .filters select{flex:1}
+  .dsum{grid-template-columns:1fr 1fr}
+  .dbody{padding:14px 15px 18px}
+  .dhead{padding:16px 15px 13px}
+  .dtable{max-height:58vh}
 }
 @media(max-width:420px){
   .kpis{grid-template-columns:1fr}
@@ -318,7 +351,7 @@ textarea{resize:vertical;min-height:64px}
 
 <main class="wrap">
   <section class="kpis">
-    <article class="kpi" style="--accent:#b44830;--tint:#fdece7">
+    <article class="kpi clickable" style="--accent:#b44830;--tint:#fdece7" role="button" tabindex="0" aria-label="เปิดรายละเอียดรายการพัสดุทั้งหมด" title="คลิกเพื่อดูรายละเอียดพัสดุทั้งหมด" onclick="openInventoryList()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openInventoryList()}">
       <div class="ico">📦</div>
       <span class="k">รายการพัสดุ</span>
       <strong class="v" id="items">-</strong>
@@ -336,7 +369,7 @@ textarea{resize:vertical;min-height:64px}
       <strong class="v" id="value">-</strong>
       <span class="s">คิดตามราคาต่อหน่วย</span>
     </article>
-    <article class="kpi" style="--accent:#3b5bdb;--tint:#eef2fd">
+    <article class="kpi clickable" style="--accent:#3b5bdb;--tint:#eef2fd" role="button" tabindex="0" aria-label="เปิดรายละเอียดครุภัณฑ์" title="คลิกเพื่อดูรายละเอียดครุภัณฑ์" onclick="openAssetList()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openAssetList()}">
       <div class="ico">🖥️</div>
       <span class="k">ครุภัณฑ์</span>
       <strong class="v" id="assets">-</strong>
@@ -368,27 +401,6 @@ textarea{resize:vertical;min-height:64px}
     </div>
   </section>
 
-  <div class="split">
-    <section class="panel">
-      <div class="panel-head"><h2>รายการใกล้หมด</h2><span class="hint">ควรเติมสต็อก</span></div>
-      <div id="lowTable"></div>
-    </section>
-    <section class="panel">
-      <div class="panel-head"><h2>ทางลัด</h2><span class="hint">จัดการคลัง</span></div>
-      <div class="qa">
-        <button class="qa-main" onclick="openItem()"><span>＋</span>เพิ่มพัสดุ</button>
-        <button onclick="openTxn()"><span>↕</span>รับเข้า / เบิกออก</button>
-        <button onclick="openAsset()"><span>🖥️</span>เพิ่มครุภัณฑ์</button>
-        <button onclick="openLoan()"><span>📋</span>ยืมครุภัณฑ์</button>
-        <button onclick="document.getElementById('fileInput').click()"><span>📁</span>นำเข้า CSV</button>
-        <button onclick="importUrl()"><span>🔗</span>นำเข้าลิงก์</button>
-        <button onclick="setupNow()"><span>⚙️</span>ตั้งค่าระบบ</button>
-        <a href="withdraw.html" target="_blank" rel="noopener"><span>🛒</span>หน้าเบิกพัสดุ</a>
-      </div>
-      <input id="fileInput" type="file" accept=".csv,text/csv" style="display:none" onchange="importCsv(this.files[0])">
-    </section>
-  </div>
-
   <section class="panel" id="historyPanel">
     <div class="panel-head">
       <h2>ประวัติการเบิก–รับเข้า</h2>
@@ -411,6 +423,27 @@ textarea{resize:vertical;min-height:64px}
     <div class="hlist" id="historyList"><div class="empty">กำลังโหลดประวัติ…</div></div>
     <div class="hmore"><button class="secondary" id="hMore" onclick="loadMoreHistory()" style="display:none">โหลดเพิ่ม</button></div>
   </section>
+
+  <div class="split">
+    <section class="panel">
+      <div class="panel-head"><h2>รายการใกล้หมด</h2><span class="hint">ควรเติมสต็อก</span></div>
+      <div id="lowTable"></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2>ทางลัด</h2><span class="hint">จัดการคลัง</span></div>
+      <div class="qa">
+        <button class="qa-main" onclick="openItem()"><span>＋</span>เพิ่มพัสดุ</button>
+        <button onclick="openTxn()"><span>↕</span>รับเข้า / เบิกออก</button>
+        <button onclick="openAsset()"><span>🖥️</span>เพิ่มครุภัณฑ์</button>
+        <button onclick="openLoan()"><span>📋</span>ยืมครุภัณฑ์</button>
+        <button onclick="document.getElementById('fileInput').click()"><span>📁</span>นำเข้า CSV</button>
+        <button onclick="importUrl()"><span>🔗</span>นำเข้าลิงก์</button>
+        <button onclick="setupNow()"><span>⚙️</span>ตั้งค่าระบบ</button>
+        <a href="withdraw.html" target="_blank" rel="noopener"><span>🛒</span>หน้าเบิกพัสดุ</a>
+      </div>
+      <input id="fileInput" type="file" accept=".csv,text/csv" style="display:none" onchange="importCsv(this.files[0])">
+    </section>
+  </div>
 
   <section class="panel">
     <div class="panel-head">
@@ -438,6 +471,23 @@ textarea{resize:vertical;min-height:64px}
   <div class="dialog">
     <h2 id="modalTitle"></h2>
     <div id="modalBody"></div>
+  </div>
+</div>
+
+<div class="modal" id="detailModal">
+  <div class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+    <div class="dhead">
+      <div>
+        <h2 id="detailTitle">รายละเอียด</h2>
+        <p id="detailSub"></p>
+      </div>
+      <button class="dclose" type="button" onclick="closeDetail()" aria-label="ปิดหน้าต่าง">✕</button>
+    </div>
+    <div class="dbody">
+      <div class="dsum" id="detailSummary"></div>
+      <div class="dsearch"><input id="detailSearch" placeholder="ค้นหาในรายการนี้…" oninput="renderDetailTable()" aria-label="ค้นหาในรายละเอียด"></div>
+      <div class="dtable" id="detailBody"></div>
+    </div>
   </div>
 </div>
 
@@ -614,6 +664,150 @@ function txnSave(){if(txnType==='ADJUST'){call('recordTransaction',{ItemID:$('tI
   draw();
   loadHistory();
   setInterval(function () { if (document.visibilityState === 'visible') loadHistory(); }, 60000);
+})();
+</script>
+<script>
+/* ===== KPI drill-down detail windows ===== */
+(function () {
+  var kind = '';
+  var lastFocus = null;
+
+  function n(v) { return Number(v || 0); }
+  function fmtNum(v) { return n(v).toLocaleString('th-TH'); }
+  function fmtDate(v) {
+    if (!v) return '—';
+    var d = new Date(v);
+    if (isNaN(d.getTime())) return String(v);
+    return d.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+  function stat(label, value, unit) {
+    return '<div class="hstat"><span>' + esc(label) + '</span><b>' + fmtNum(value) + '</b> <small>' + esc(unit || '') + '</small></div>';
+  }
+  function stockBadge(x) {
+    var q = n(x.Quantity), m = n(x.MinStock);
+    if (q <= 0) return '<span class="badge danger">หมด</span>';
+    if (q <= m) return '<span class="badge warn">ใกล้หมด</span>';
+    return '<span class="badge">ปกติ</span>';
+  }
+  function assetBadge(x) {
+    var s = String(x.Status || 'ใช้งาน');
+    if (s === 'ถูกยืม') return '<span class="badge warn">ถูกยืม</span>';
+    if (s === 'ชำรุด') return '<span class="badge danger">ชำรุด</span>';
+    return '<span class="badge">' + esc(s) + '</span>';
+  }
+
+  function open(k, title, sub) {
+    kind = k;
+    lastFocus = document.activeElement;
+    $('detailTitle').textContent = title;
+    $('detailSub').textContent = sub;
+    $('detailSearch').value = '';
+    $('detailModal').classList.add('on');
+    document.body.style.overflow = 'hidden';
+    renderDetailTable();
+    setTimeout(function () { try { $('detailSearch').focus(); } catch (e) {} }, 60);
+  }
+
+  function closeDetail() {
+    var m = $('detailModal');
+    if (!m) return;
+    m.classList.remove('on');
+    document.body.style.overflow = '';
+    kind = '';
+    if (lastFocus && typeof lastFocus.focus === 'function') { try { lastFocus.focus(); } catch (e) {} }
+  }
+
+  function openInventoryList() {
+    var inv = D.inventory || [];
+    open('inventory', '📦 รายการพัสดุทั้งหมด', inv.length ? 'พัสดุทุกหมวดหมู่ในคลัง — ' + fmtNum(inv.length) + ' รายการ' : 'ยังไม่มีรายการพัสดุในคลัง');
+    if (!inv.length) call('getDashboard').then(function (d) { D = d; renderDetailTable(); }).catch(function () {});
+  }
+
+  function openAssetList() {
+    var a = D.assets || [];
+    open('asset', '🖥️ รายละเอียดครุภัณฑ์', a.length ? 'ทะเบียนครุภัณฑ์ทั้งหมด — ' + fmtNum(a.length) + ' รายการ' : 'ยังไม่มีข้อมูลครุภัณฑ์ในทะเบียน');
+    if (!a.length) call('getDashboard').then(function (d) { D = d; renderDetailTable(); }).catch(function () {});
+  }
+
+  function renderDetailTable() {
+    var body = $('detailBody');
+    var sum = $('detailSummary');
+    if (!body) return;
+    var q = String(($('detailSearch') || {}).value || '').trim().toLowerCase();
+    var rows = [];
+
+    if (kind === 'inventory') {
+      var inv = D.inventory || [];
+      var low = 0, totalQty = 0, cats = {};
+      inv.forEach(function (x) {
+        totalQty += n(x.Quantity);
+        if (n(x.Quantity) <= n(x.MinStock)) low++;
+        if (x.Category) cats[x.Category] = 1;
+      });
+      if (sum) sum.innerHTML = stat('รายการทั้งหมด', inv.length, 'รายการ') + stat('คงเหลือรวม', totalQty, 'ชิ้น') +
+        stat('ใกล้หมด / หมด', low, 'รายการ') + stat('หมวดหมู่', Object.keys(cats).length, 'หมวด');
+      rows = inv.filter(function (x) {
+        if (!q) return true;
+        return [x.Code, x.Name, x.Category, x.Location, x.Type, x.Unit].join(' ').toLowerCase().indexOf(q) >= 0;
+      }).sort(function (a, b) { return String(a.Code || '').localeCompare(String(b.Code || ''), 'th', { numeric: true }); });
+      body.innerHTML = rows.length ? '<table><thead><tr><th>รหัส</th><th>รายการ</th><th>หมวดหมู่</th><th class="num">คงเหลือ</th><th class="num">จุดเตือน</th><th>สถานที่</th><th>สถานะ</th></tr></thead><tbody>' +
+        rows.map(function (x) {
+          return '<tr><td><b>' + esc(x.Code || '—') + '</b></td>' +
+            '<td class="wrap"><b>' + esc(x.Name || '—') + '</b><br><span class="muted">' + esc(x.Type || 'พัสดุ') + '</span></td>' +
+            '<td>' + esc(x.Category || '—') + '</td>' +
+            '<td class="num"><b>' + fmtNum(x.Quantity) + '</b> ' + esc(x.Unit || '') + '</td>' +
+            '<td class="num">' + fmtNum(x.MinStock) + '</td>' +
+            '<td>' + esc(x.Location || '—') + '</td>' +
+            '<td>' + stockBadge(x) + '</td></tr>';
+        }).join('') + '</tbody></table>' : '<div class="empty">ไม่พบรายการที่ค้นหา</div>';
+      return;
+    }
+
+    if (kind === 'asset') {
+      var assets = D.assets || [];
+      var use = 0, borrow = 0, broken = 0;
+      assets.forEach(function (x) {
+        var s = String(x.Status || 'ใช้งาน');
+        if (s === 'ถูกยืม') borrow++;
+        else if (s === 'ชำรุด') broken++;
+        else use++;
+      });
+      if (sum) sum.innerHTML = stat('ครุภัณฑ์ทั้งหมด', assets.length, 'รายการ') + stat('ใช้งาน', use, 'รายการ') +
+        stat('ถูกยืม', borrow, 'รายการ') + stat('ชำรุด', broken, 'รายการ');
+      rows = assets.filter(function (x) {
+        if (!q) return true;
+        return [x.AssetCode, x.Name, x.Category, x.Department, x.Location, x.Responsible, x.Status].join(' ').toLowerCase().indexOf(q) >= 0;
+      }).sort(function (a, b) { return String(a.AssetCode || '').localeCompare(String(b.AssetCode || ''), 'th', { numeric: true }); });
+      body.innerHTML = rows.length ? '<table><thead><tr><th>รหัสครุภัณฑ์</th><th>รายการ</th><th>หมวดหมู่</th><th>หน่วยงาน</th><th>สถานที่</th><th>ผู้รับผิดชอบ</th><th>สถานะ</th><th>วันที่ได้มา</th><th class="num">มูลค่า</th></tr></thead><tbody>' +
+        rows.map(function (x) {
+          var loan = (D.assetLoans || []).filter(function (l) { return String(l.AssetID) === String(x.AssetID) && l.Status === 'กำลังยืม'; })[0];
+          return '<tr><td><b>' + esc(x.AssetCode || '—') + '</b></td>' +
+            '<td class="wrap"><b>' + esc(x.Name || '—') + '</b></td>' +
+            '<td>' + esc(x.Category || '—') + '</td>' +
+            '<td>' + esc(x.Department || '—') + '</td>' +
+            '<td>' + esc(x.Location || '—') + '</td>' +
+            '<td>' + esc(x.Responsible || '—') + '</td>' +
+            '<td>' + assetBadge(x) + (loan ? '<br><span class="muted">ผู้ยืม: ' + esc(loan.Borrower || '—') + '</span>' : '') + '</td>' +
+            '<td>' + fmtDate(x.PurchaseDate) + '</td>' +
+            '<td class="num">' + (n(x.Cost) ? fmtNum(x.Cost) + ' ฿' : '—') + '</td></tr>';
+        }).join('') + '</tbody></table>' : '<div class="empty">ไม่พบรายการที่ค้นหา</div>';
+      return;
+    }
+
+    if (sum) sum.innerHTML = '';
+    body.innerHTML = '<div class="empty">ไม่มีข้อมูล</div>';
+  }
+
+  window.openInventoryList = openInventoryList;
+  window.openAssetList = openAssetList;
+  window.closeDetail = closeDetail;
+  window.renderDetailTable = renderDetailTable;
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && kind) closeDetail();
+  });
+  var modal = document.getElementById('detailModal');
+  if (modal) modal.addEventListener('mousedown', function (e) { if (e.target === modal) closeDetail(); });
 })();
 </script>
 </body>
