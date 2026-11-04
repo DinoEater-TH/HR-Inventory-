@@ -1,6 +1,388 @@
-<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&amp;display=swap" rel="stylesheet"><title>คลังพัสดุและครุภัณฑ์</title><style>
-:root{--blue:#1455d9;--bg:#f4f7fb;--text:#172033;--muted:#64748b;--red:#dc2626;--green:#078447}*{box-sizing:border-box}button,input,select,textarea{font-family:inherit}body{margin:0;background:var(--bg);font:14px/1.5 "Sarabun","Noto Sans Thai","Leelawadee UI",Tahoma,"Segoe UI",Arial,sans-serif;color:var(--text)}header{background:linear-gradient(120deg,#103b9b,#2874e8);color:#fff;padding:24px max(18px,calc((100% - 1200px)/2));display:flex;justify-content:space-between;align-items:center}h1{font-size:24px;margin:0}header small{opacity:.8}.wrap{max-width:1200px;margin:auto;padding:20px}.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.card,.panel{background:#fff;border-radius:14px;padding:18px;box-shadow:0 3px 15px #17203312}.card b{font-size:25px;display:block;margin-top:7px}.label{color:var(--muted);font-size:12px}.red{color:var(--red)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}.panel h2{font-size:17px;margin:0 0 14px}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}button{border:0;border-radius:8px;background:var(--blue);color:white;padding:9px 14px;cursor:pointer}button.secondary{background:#e8eefc;color:#19449d}button.danger{background:#fee2e2;color:#a71919}input,select,textarea{border:1px solid #d4dbe8;border-radius:7px;padding:9px;background:#fff;min-width:0;width:100%}table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:9px 7px;border-bottom:1px solid #edf0f5;text-align:left}th{color:var(--muted);background:#fafbfe}.tablewrap{overflow:auto;max-height:430px}.badge{background:#e8f7ef;color:var(--green);padding:3px 7px;border-radius:20px;font-size:11px}.badge.warn{background:#fff1db;color:#a15c00}.modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;padding:18px}.modal.on{display:flex}.dialog{background:#fff;border-radius:14px;max-width:560px;width:100%;padding:20px;max-height:88vh;overflow:auto}.form{display:grid;grid-template-columns:1fr 1fr;gap:10px}.form label{font-size:12px;color:var(--muted)}.form label.full{grid-column:1/-1}.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}.bar{height:9px;background:#dce7ff;border-radius:10px;margin-top:6px}.bar i{display:block;height:100%;background:var(--blue);border-radius:10px}.empty{color:var(--muted);padding:18px;text-align:center}@media(max-width:800px){.cards{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.wrap{padding:12px}header{padding:18px 12px}.form{grid-template-columns:1fr}.form label.full{grid-column:auto}}
-</style></head><body><header><div><h1>📦 Office Inventory Dashboard</h1><small>ระบบแดชบอร์ดคลังพัสดุและครุภัณฑ์สำนักงาน</small></div><button onclick="load()">รีเฟรชข้อมูล</button></header><main class="wrap"><section class="cards"><div class="card"><span class="label">รายการพัสดุ</span><b id="items">-</b></div><div class="card"><span class="label">จำนวนคงเหลือรวม</span><b id="qty">-</b></div><div class="card"><span class="label">มูลค่าคงคลัง</span><b id="value">-</b></div><div class="card"><span class="label">ครุภัณฑ์</span><b id="assets">-</b></div><div class="card"><span class="label">ใกล้หมด</span><b class="red" id="low">-</b></div></section><div class="toolbar"><button onclick="openItem()">＋ เพิ่มพัสดุ</button><button class="secondary" onclick="document.getElementById('fileInput').click()">นำเข้าจากไฟล์ CSV</button><button class="secondary" onclick="importUrl()">นำเข้าจากลิงก์</button><input id="fileInput" type="file" accept=".csv,text/csv" style="display:none" onchange="importCsv(this.files[0])"><button class="secondary" onclick="openTxn()">↕ รับเข้า / เบิกออก</button><button class="secondary" onclick="openAsset()">＋ เพิ่มครุภัณฑ์</button><button class="secondary" onclick="openLoan()">📋 ยืมครุภัณฑ์</button><button class="secondary" onclick="setupNow()">ตั้งค่าระบบครั้งแรก</button></div><section class="grid"><div class="panel"><h2>รายการใกล้หมด</h2><div id="lowTable"></div></div><div class="panel"><h2>สรุปตามหมวดหมู่</h2><div id="categories"></div></div></section><section class="panel" style="margin-top:16px"><h2>คลังพัสดุ <input id="search" placeholder="ค้นหาชื่อ / รหัส / หมวดหมู่" oninput="renderInventory()" style="max-width:290px;float:right"></h2><div class="tablewrap" id="inventoryTable"></div></section><section class="panel" style="margin-top:16px"><h2>ทะเบียนครุภัณฑ์ <button class="secondary" style="float:right;padding:6px 12px" onclick="openLoan()">📋 ยืมครุภัณฑ์</button></h2><div class="tablewrap" id="assetTable"></div></section><section class="panel" style="margin-top:16px"><h2>ประวัติการยืม–คืนครุภัณฑ์</h2><div class="tablewrap" id="loanTable"></div></section></main><div class="modal" id="modal"><div class="dialog"><h2 id="modalTitle"></h2><div id="modalBody"></div></div></div><script src="config.js?v=14"></script><script>
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#54180c">
+<link rel="icon" type="image/png" href="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<title>HR Inventory | ระบบคลังพัสดุและครุภัณฑ์ กองทรัพยากรบุคคล</title>
+<style>
+:root{
+  --brand:#b44830;
+  --brand-2:#d1603d;
+  --brand-dark:#8c3521;
+  --brand-deep:#54180c;
+  --amber:#f09c18;
+  --amber-2:#ffc46b;
+  --ink:#2a1d17;
+  --muted:#7a6a61;
+  --line:#ece2d9;
+  --bg:#f7f4f0;
+  --card:#fff;
+  --ok:#1f7a4d;
+  --warn:#a15c00;
+  --danger:#b42318;
+  --shadow:0 18px 40px -32px rgba(84,24,12,.55);
+}
+*{box-sizing:border-box}
+button,input,select,textarea{font-family:inherit}
+html{scroll-behavior:smooth}
+body{
+  margin:0;color:var(--ink);
+  font:14px/1.5 "Sarabun","Noto Sans Thai","Leelawadee UI",Tahoma,"Segoe UI",Arial,sans-serif;
+  background:
+    radial-gradient(900px 420px at 10% -10%,#ffe7c8 0%,transparent 60%),
+    radial-gradient(760px 400px at 95% -8%,#ffd9c9 0%,transparent 55%),
+    var(--bg);
+  min-height:100vh;
+}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#dcc9bc;border-radius:99px;border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#c4a795;background-clip:content-box}
+
+/* ===== Header ===== */
+header{
+  position:relative;overflow:hidden;color:#fff;
+  background:linear-gradient(115deg,#3d0f06 0%,#6d2313 46%,#9c3d1d 100%);
+  border-bottom:3px solid var(--amber);
+  padding:22px max(18px,calc((100% - 1320px)/2));
+  display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;
+}
+header::before{
+  content:'';position:absolute;inset:0;pointer-events:none;opacity:.55;
+  background-image:repeating-linear-gradient(115deg,rgba(255,255,255,.05) 0 1px,transparent 1px 26px);
+}
+header::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(620px 220px at 14% 0%,rgba(255,196,107,.38),transparent 70%),
+    radial-gradient(520px 240px at 88% 120%,rgba(240,156,24,.28),transparent 70%);
+}
+header>*{position:relative;z-index:1}
+.brand{display:flex;align-items:center;gap:15px;min-width:0}
+.logo{
+  width:60px;height:60px;border-radius:17px;background:#fff;padding:6px;object-fit:contain;
+  box-shadow:0 12px 26px -12px rgba(0,0,0,.75);flex:0 0 auto;
+}
+.brand h1{margin:0;font-size:27px;line-height:1.1;font-weight:700;letter-spacing:.3px}
+.brand h1 span{
+  background:linear-gradient(92deg,#ffe0a8,var(--amber));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:var(--amber);
+}
+.brand p{margin:5px 0 0;font-size:13.5px;color:rgba(255,255,255,.84);font-weight:400}
+.top-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.stamp{
+  display:inline-flex;align-items:center;gap:7px;white-space:nowrap;
+  font-size:12px;color:rgba(255,255,255,.82);
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);
+  padding:8px 13px;border-radius:999px;
+}
+.stamp i{width:7px;height:7px;border-radius:50%;background:#6ee7a8;box-shadow:0 0 0 3px rgba(110,231,168,.22);animation:pulse 2.4s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.top-actions button,.top-actions a{
+  display:inline-flex;align-items:center;gap:6px;text-decoration:none;cursor:pointer;
+  background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.22);color:#fff;
+  border-radius:11px;padding:9px 14px;font-size:13px;font-weight:600;box-shadow:none;
+}
+.top-actions button:hover,.top-actions a:hover{background:rgba(255,255,255,.24);transform:translateY(-1px)}
+
+/* ===== Layout ===== */
+.wrap{max-width:1320px;margin:0 auto;padding:22px 18px 52px}
+.panel{
+  background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;
+  box-shadow:var(--shadow);display:flex;flex-direction:column;
+}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.panel h2,.panel-head h2{
+  display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:#3a2a22;margin:0;
+}
+.panel h2::before,.panel-head h2::before{
+  content:'';width:4px;height:17px;border-radius:2px;flex:0 0 auto;
+  background:linear-gradient(180deg,var(--amber),var(--brand));
+}
+.hint{font-size:12px;color:var(--muted)}
+
+/* ===== KPI ===== */
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+.kpi{
+  position:relative;background:var(--card);border:1px solid var(--line);border-radius:18px;
+  padding:16px 16px 15px 20px;overflow:hidden;box-shadow:var(--shadow);
+  transition:transform .18s ease,box-shadow .18s ease;
+}
+.kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent,#b44830)}
+.kpi:hover{transform:translateY(-3px);box-shadow:0 22px 44px -30px rgba(84,24,12,.7)}
+.kpi .ico{
+  width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:18px;
+  background:var(--tint,#fdf1dc);margin-bottom:10px;
+}
+.kpi .k{display:block;font-size:12.5px;font-weight:600;color:var(--muted)}
+.kpi .v{display:block;font-size:26px;font-weight:700;letter-spacing:-.4px;line-height:1.25;margin-top:2px}
+.kpi .s{display:block;font-size:11.5px;color:#a3948b;margin-top:2px}
+.kpi.hot .v{color:var(--danger)}
+
+/* ===== Charts ===== */
+.charts{display:grid;grid-template-columns:1.05fr 1.25fr .95fr;gap:16px;margin-top:16px}
+.donut-wrap{display:flex;align-items:center;gap:16px;min-height:0}
+#donutChart{flex:0 0 148px;max-width:148px}
+#donutChart svg{width:100%;height:auto;display:block}
+.dnum{font-size:21px;font-weight:700;fill:var(--ink)}
+.dsub{font-size:9.5px;fill:var(--muted)}
+#categories{flex:1;min-width:0;max-height:190px;overflow:auto;padding-right:4px}
+#categories>div{font-size:12.5px;font-weight:600;color:#4a382f}
+#categories b{float:right;font-weight:700;color:var(--brand-dark)}
+.bar{height:6px;border-radius:99px;background:#f3ece6;overflow:hidden;margin:5px 0 10px}
+.bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#f6b53f,var(--brand))}
+#barChart{display:flex;flex-direction:column;gap:10px}
+.barrow{display:grid;grid-template-columns:1fr auto;gap:3px 10px;align-items:center}
+.barrow .n{font-size:12.5px;font-weight:600;color:#4a382f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.barrow .q{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.barrow .t{grid-column:1/-1;height:9px;border-radius:99px;background:#f4ede7;overflow:hidden}
+.barrow .t i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#f6b53f,var(--brand))}
+.gauge{width:100%;max-width:230px;height:auto;display:block;margin:0 auto}
+.gnum{font-size:24px;font-weight:700;fill:var(--ink)}
+.gsub{font-size:10px;fill:var(--muted)}
+.ministat{display:flex;justify-content:space-between;gap:8px;margin-top:auto;padding-top:12px;border-top:1px dashed var(--line)}
+.ministat span{font-size:11.5px;color:var(--muted);text-align:center;flex:1}
+.ministat b{display:block;font-size:15px;color:var(--ink)}
+.ministat b.ok{color:var(--ok)}
+.ministat b.warn{color:var(--warn)}
+
+/* ===== Split row ===== */
+.split{display:grid;grid-template-columns:1.55fr 1fr;gap:16px;margin-top:16px}
+section.panel{margin-top:16px}
+.split section.panel{margin-top:0}
+.tablewrap{overflow:auto;max-height:440px;border:1px solid var(--line);border-radius:12px}
+.tablewrap.plain{border:0;border-radius:0;max-height:320px}
+
+/* ===== Tables ===== */
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
+th,td{padding:10px 12px;border-bottom:1px solid #f2ebe4;text-align:left;vertical-align:middle}
+th{
+  position:sticky;top:0;z-index:1;background:#fbf7f3;color:var(--muted);
+  font-size:11.5px;font-weight:600;letter-spacing:.2px;white-space:nowrap;
+}
+tbody tr:last-child td,table tr:last-child td{border-bottom:0}
+table tr:hover td{background:#fffaf5}
+.tablewrap button{padding:6px 11px;font-size:12px;border-radius:8px}
+
+/* ===== Badges / misc ===== */
+.badge{display:inline-block;background:#e9f6ee;color:var(--ok);padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap}
+.badge.warn{background:#fdf1dc;color:var(--warn)}
+.label{font-size:11.5px;color:var(--muted)}
+.red{color:var(--danger)}
+.empty{padding:28px 14px;text-align:center;color:var(--muted);font-size:13px}
+
+/* ===== Buttons ===== */
+button{
+  font:inherit;font-weight:600;color:#fff;cursor:pointer;border:0;border-radius:10px;
+  padding:9px 14px;background:linear-gradient(135deg,var(--brand-2),var(--brand-dark));
+  box-shadow:0 10px 20px -14px rgba(140,53,33,.9);
+  transition:transform .16s ease,background .16s ease,box-shadow .16s ease;
+}
+button:hover{transform:translateY(-1px);box-shadow:0 14px 24px -14px rgba(140,53,33,.95)}
+button:active{transform:translateY(0)}
+button:disabled{opacity:.6;cursor:progress;transform:none}
+button.secondary{background:#fff;color:var(--brand-dark);border:1px solid #e7d8ce;box-shadow:none}
+button.secondary:hover{background:#fff7f1;border-color:#e2b9a6}
+button.danger{background:#fdecea;color:var(--danger);box-shadow:none}
+button.danger:hover{background:#fbdcd7}
+
+/* ===== Quick actions ===== */
+.qa{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.qa button,.qa a{
+  display:flex;align-items:center;gap:10px;text-align:left;text-decoration:none;
+  background:#fbf7f3;border:1px solid var(--line);color:#3a2a22;border-radius:12px;
+  padding:11px 12px;font-size:13px;font-weight:600;box-shadow:none;
+}
+.qa button:hover,.qa a:hover{background:#fff;border-color:#e2b9a6;transform:translateY(-2px)}
+.qa span{
+  width:27px;height:27px;border-radius:9px;display:grid;place-items:center;flex:0 0 auto;
+  background:#f3e7dd;font-size:14px;
+}
+.qa .qa-main{background:linear-gradient(135deg,var(--brand-2),var(--brand-dark));border-color:transparent;color:#fff}
+.qa .qa-main span{background:rgba(255,255,255,.2)}
+.qa .qa-main:hover{background:linear-gradient(135deg,#d96b45,#7d2d1a);border-color:transparent}
+
+/* ===== Form controls ===== */
+input,select,textarea{
+  font:inherit;color:var(--ink);width:100%;min-width:0;
+  border:1px solid #e3d6cc;border-radius:10px;padding:9px 11px;background:#fff;
+  transition:border-color .16s,box-shadow .16s;
+}
+input:focus,select:focus,textarea:focus{
+  outline:none;border-color:#e0a06f;box-shadow:0 0 0 3px rgba(240,156,24,.18);
+}
+textarea{resize:vertical;min-height:64px}
+#search{max-width:290px;background:#fbf7f3;border-radius:999px;padding-left:15px}
+
+/* ===== Modal ===== */
+.modal{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(42,20,12,.55);backdrop-filter:blur(4px)}
+.modal.on{display:flex}
+.dialog{
+  background:#fff;border-radius:20px;width:100%;max-width:640px;max-height:88vh;overflow:auto;
+  padding:22px;box-shadow:0 40px 80px -30px rgba(0,0,0,.55);border-top:4px solid var(--amber);
+}
+.modal.on .dialog{animation:pop .22s ease-out}
+@keyframes pop{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:none}}
+.dialog h2{font-size:18px;margin:0 0 16px;color:#3a2a22}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form label{font-size:12px;font-weight:600;color:var(--muted)}
+.form label.full{grid-column:1/-1}
+.form label input,.form label select,.form label textarea{margin-top:4px;font-weight:400;color:var(--ink)}
+.actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+
+/* ===== Responsive ===== */
+@media(max-width:1100px){
+  .kpis{grid-template-columns:repeat(3,1fr)}
+  .charts{grid-template-columns:1fr 1fr}
+  .charts .panel:last-child{grid-column:1/-1}
+  .split{grid-template-columns:1fr}
+}
+@media(max-width:760px){
+  header{padding:18px 16px;gap:14px}
+  .brand h1{font-size:22px}
+  .brand p{font-size:12.5px}
+  .logo{width:50px;height:50px;border-radius:14px}
+  .wrap{padding:16px 14px 40px}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .charts{grid-template-columns:1fr}
+  .charts .panel:last-child{grid-column:auto}
+  .form{grid-template-columns:1fr}
+  #search{max-width:none}
+  .panel-head{flex-direction:column;align-items:flex-start}
+}
+@media(max-width:420px){
+  .kpis{grid-template-columns:1fr}
+  .qa{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <img class="logo" src="assets/logo.png" alt="โลโก้กองทรัพยากรบุคคล">
+    <div>
+      <h1>HR <span>Inventory</span></h1>
+      <p>ระบบคลังพัสดุและครุภัณฑ์ กองทรัพยากรบุคคล</p>
+    </div>
+  </div>
+  <div class="top-actions">
+    <span class="stamp"><i></i><span id="stamp">กำลังโหลดข้อมูล…</span></span>
+    <button onclick="load()">↻ รีเฟรช</button>
+    <a href="withdraw.html" target="_blank" rel="noopener">🛒 หน้าเบิกพัสดุ</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="kpis">
+    <article class="kpi" style="--accent:#b44830;--tint:#fdece7">
+      <div class="ico">📦</div>
+      <span class="k">รายการพัสดุ</span>
+      <strong class="v" id="items">-</strong>
+      <span class="s">รายการในคลังทั้งหมด</span>
+    </article>
+    <article class="kpi" style="--accent:#f09c18;--tint:#fff3df">
+      <div class="ico">🧮</div>
+      <span class="k">จำนวนคงเหลือรวม</span>
+      <strong class="v" id="qty">-</strong>
+      <span class="s">ชิ้น / หน่วยนับรวมกัน</span>
+    </article>
+    <article class="kpi" style="--accent:#1f7a4d;--tint:#e9f6ee">
+      <div class="ico">💰</div>
+      <span class="k">มูลค่าคงคลัง</span>
+      <strong class="v" id="value">-</strong>
+      <span class="s">คิดตามราคาต่อหน่วย</span>
+    </article>
+    <article class="kpi" style="--accent:#3b5bdb;--tint:#eef2fd">
+      <div class="ico">🖥️</div>
+      <span class="k">ครุภัณฑ์</span>
+      <strong class="v" id="assets">-</strong>
+      <span class="s">รายการในทะเบียนครุภัณฑ์</span>
+    </article>
+    <article class="kpi hot" style="--accent:#dc2626;--tint:#fdeaea">
+      <div class="ico">⚠️</div>
+      <span class="k">ใกล้หมด</span>
+      <strong class="v" id="low">-</strong>
+      <span class="s">ถึงจุดแจ้งเตือนขั้นต่ำ</span>
+    </article>
+  </section>
+
+  <section class="charts">
+    <div class="panel">
+      <div class="panel-head"><h2>สัดส่วนคงเหลือตามหมวดหมู่</h2><span class="hint">จำนวนชิ้น</span></div>
+      <div class="donut-wrap">
+        <div id="donutChart"></div>
+        <div id="categories"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h2>รายการคงเหลือสูงสุด</h2><span class="hint">8 อันดับแรก</span></div>
+      <div id="barChart"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h2>สุขภาพสต็อก</h2></div>
+      <div id="gaugeChart"></div>
+    </div>
+  </section>
+
+  <div class="split">
+    <section class="panel">
+      <div class="panel-head"><h2>รายการใกล้หมด</h2><span class="hint">ควรเติมสต็อก</span></div>
+      <div id="lowTable"></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2>ทางลัด</h2><span class="hint">จัดการคลัง</span></div>
+      <div class="qa">
+        <button class="qa-main" onclick="openItem()"><span>＋</span>เพิ่มพัสดุ</button>
+        <button onclick="openTxn()"><span>↕</span>รับเข้า / เบิกออก</button>
+        <button onclick="openAsset()"><span>🖥️</span>เพิ่มครุภัณฑ์</button>
+        <button onclick="openLoan()"><span>📋</span>ยืมครุภัณฑ์</button>
+        <button onclick="document.getElementById('fileInput').click()"><span>📁</span>นำเข้า CSV</button>
+        <button onclick="importUrl()"><span>🔗</span>นำเข้าลิงก์</button>
+        <button onclick="setupNow()"><span>⚙️</span>ตั้งค่าระบบ</button>
+        <a href="withdraw.html" target="_blank" rel="noopener"><span>🛒</span>หน้าเบิกพัสดุ</a>
+      </div>
+      <input id="fileInput" type="file" accept=".csv,text/csv" style="display:none" onchange="importCsv(this.files[0])">
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>คลังพัสดุ</h2>
+      <input id="search" placeholder="🔍 ค้นหาชื่อ / รหัส / หมวดหมู่" oninput="renderInventory()">
+    </div>
+    <div class="tablewrap" id="inventoryTable"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>ทะเบียนครุภัณฑ์</h2>
+      <button class="secondary" onclick="openLoan()">📋 ยืมครุภัณฑ์</button>
+    </div>
+    <div class="tablewrap" id="assetTable"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>ประวัติการยืม–คืนครุภัณฑ์</h2></div>
+    <div class="tablewrap" id="loanTable"></div>
+  </section>
+</main>
+
+<div class="modal" id="modal">
+  <div class="dialog">
+    <h2 id="modalTitle"></h2>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script src="config.js?v=15"></script><script>
 let D={inventory:[],assets:[],assetLoans:[],transactions:[]};const $=id=>document.getElementById(id);const esc=x=>String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));const API=window.API_URL||'';function call(fn,arg){const data=arg===undefined?null:arg;const read=['getDashboard','getItemList','getNextItemCode','getNextAssetCode'].indexOf(fn)>=0;const p=read?apiGet(fn,data):apiPost(fn,data);return p.catch(e=>{alert(e.message||e);throw e})}function apiPost(fn,data){return fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:fn,data:data})}).then(r=>r.json()).then(j=>{if(!j.ok){const e=new Error(j.error||'เซิร์ฟเวอร์ขัดข้อง');e.biz=1;throw e}return j.result})}function apiGet(fn,data){const url=API+'?action='+encodeURIComponent(fn)+'&data='+encodeURIComponent(JSON.stringify(data));const one=()=>fetch(url).then(r=>r.json()).then(j=>{if(!j.ok){const e=new Error(j.error||'เซิร์ฟเวอร์ขัดข้อง');e.biz=1;throw e}return j.result});return one().catch(e=>{if(e&&e.biz)throw e;return jsonp(fn,data)})}function jsonp(fn,data){return new Promise((res,rej)=>{const cb='__apicb'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);const s=document.createElement('script');const clean=()=>{try{delete window[cb]}catch(_){window[cb]=undefined}s.remove()};window[cb]=j=>{clean();if(!j||!j.ok)rej(new Error(j&&j.error?j.error:'ข้อผิดพลาดจากเซิร์ฟเวอร์'));else res(j.result)};s.onerror=()=>{clean();rej(new Error('ติดต่อเซิร์ฟเวอร์ไม่ได้'))};s.src=API+'?callback='+cb+'&action='+encodeURIComponent(fn)+'&data='+encodeURIComponent(JSON.stringify(data));document.body.appendChild(s)})}function load(){call('getDashboard').then(d=>{D=d;render()})}function render(){const s=D.summary||{};$('items').textContent=s.items||0;$('qty').textContent=(s.quantity||0).toLocaleString();$('value').textContent=(s.value||0).toLocaleString(undefined,{maximumFractionDigits:2})+' ฿';$('assets').textContent=s.assets||0;$('low').textContent=s.low||0;renderInventory();renderAssets();renderLoans();$('lowTable').innerHTML=D.low?.length?'<table><tr><th>รายการ</th><th>เหลือ</th><th>ขั้นต่ำ</th></tr>'+D.low.map(x=>`<tr><td>${esc(x.Name)}</td><td class="red">${x.Quantity} ${esc(x.Unit)}</td><td>${x.MinStock}</td></tr>`).join('')+'</table>':'<div class="empty">ไม่มีรายการใกล้หมด</div>';let cs=D.categories||{},max=Math.max(1,...Object.values(cs));$('categories').innerHTML=Object.entries(cs).map(([k,v])=>`<div>${esc(k)} <b style="float:right">${v}</b><div class="bar"><i style="width:${v/max*100}%"></i></div></div>`).join('')||'<div class="empty">ยังไม่มีข้อมูล</div>'}function renderInventory(){let q=($('search').value||'').toLowerCase(),a=D.inventory.filter(x=>[x.Name,x.Code,x.Category].join(' ').toLowerCase().includes(q));$('inventoryTable').innerHTML=a.length?'<table><tr><th>รหัส</th><th>รายการ</th><th>หมวดหมู่</th><th>คงเหลือ</th><th>สถานที่</th><th></th></tr>'+a.map(x=>`<tr><td>${esc(x.Code)}</td><td><b>${esc(x.Name)}</b><br><span class="label">${esc(x.Type)}</span></td><td>${esc(x.Category)}</td><td>${x.Quantity} ${esc(x.Unit)} ${Number(x.Quantity)<=Number(x.MinStock)?'<span class="badge warn">ใกล้หมด</span>':''}</td><td>${esc(x.Location)}</td><td><button class="secondary" onclick='openItem(${JSON.stringify(x)})'>แก้ไข</button> <button class='danger' onclick="removeRecord('${x.ItemID||x.AssetID}')">ลบ</button></td></tr>`).join('')+'</table>':'<div class="empty">ไม่พบข้อมูล</div>'}function renderAssets(){$('assetTable').innerHTML=D.assets.length?'<table><tr><th>รหัสครุภัณฑ์</th><th>รายการ</th><th>หน่วยงาน</th><th>สถานที่</th><th>ผู้รับผิดชอบ</th><th>สถานะ</th><th></th></tr>'+D.assets.map(x=>{const actLoan=(D.assetLoans||[]).find(l=>String(l.AssetID)===String(x.AssetID)&&l.Status==='กำลังยืม');const badgeCls=x.Status==='ถูกยืม'||x.Status==='ชำรุด'?'badge warn':'badge';const loanBtn=x.Status==='ถูกยืม'&&actLoan?`<button onclick="openReturn('${actLoan.LoanID}')">รับคืน</button>`:(x.Status==='ใช้งาน'||!x.Status?`<button class="secondary" onclick="openLoan('${x.AssetID}')">ยืม</button>`:'');return `<tr><td><b>${esc(x.AssetCode)}</b></td><td>${esc(x.Name)}</td><td>${esc(x.Department)}</td><td>${esc(x.Location)}</td><td>${esc(x.Responsible)}</td><td><span class="${badgeCls}">${esc(x.Status||'ใช้งาน')}</span>${actLoan?`<br><small class="label">ผู้ยืม: ${esc(actLoan.Borrower)}</small>`:''}</td><td>${loanBtn} <button class="secondary" onclick='openAsset(${JSON.stringify(x)})'>แก้ไข</button> <button class='danger' onclick="removeRecord('${x.AssetID}')">ลบ</button></td></tr>`}).join('')+'</table>':'<div class="empty">ยังไม่มีข้อมูลครุภัณฑ์</div>'}function fmtDate(v){if(!v)return '-';const d=new Date(v);return isNaN(d)?esc(v):d.toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'})}function renderLoans(){const list=D.assetLoans||[];$('loanTable').innerHTML=list.length?'<table><tr><th>รหัส / ครุภัณฑ์</th><th>ผู้ยืม (หน่วยงาน)</th><th>นำไปใช้ในงาน</th><th>วันที่ยืม → กำหนดคืน</th><th>สภาพก่อนยืม</th><th>การคืน / สภาพหลังคืน</th><th>สถานะ</th><th></th></tr>'+list.map(x=>`<tr><td><b>${esc(x.AssetCode)}</b><br><span class="label">${esc(x.AssetName)}</span></td><td><b>${esc(x.Borrower)}</b>${x.Department?`<br><span class="label">${esc(x.Department)}</span>`:''}</td><td>${esc(x.Purpose)}</td><td>ยืม: ${fmtDate(x.BorrowDate)}<br>กำหนดคืน: ${fmtDate(x.DueDate)}${x.ReturnDate?`<br><b>คืนจริง: ${fmtDate(x.ReturnDate)}</b>`:''}</td><td>${esc(x.ConditionBefore||'-')}</td><td>${x.Status==='คืนแล้ว'?`<b>${esc(x.ReturnedComplete||'-')}</b><br><span class="label">สภาพ: ${esc(x.ConditionAfter||'-')}</span>`:'-'}${x.Note?`<br><small class="label">หมายเหตุ: ${esc(x.Note)}</small>`:''}</td><td><span class="${x.Status==='กำลังยืม'?'badge warn':'badge'}">${esc(x.Status)}</span></td><td>${x.Status==='กำลังยืม'?`<button onclick="openReturn('${x.LoanID}')">บันทึกคืน</button> `:''}<button class="danger" onclick="removeRecord('${x.LoanID}')">ลบ</button></td></tr>`).join('')+'</table>':'<div class="empty">ยังไม่มีประวัติการยืม–คืนครุภัณฑ์</div>'}
 function removeRecord(id){if(!confirm('ยืนยันการลบรายการนี้?'))return;const s=String(id);const fn=s.indexOf('IT')===0?'deleteItem':(s.indexOf('LN')===0?'deleteAssetLoan':'deleteAsset');call(fn,{id:id}).then(d=>{D=d;render()}).catch(e=>alert(e.message||'เกิดข้อผิดพลาด'))}function importUrl(){const url=prompt('วางลิงก์ CSV หรือ Google Sheet ที่แชร์เป็นผู้มีลิงก์ดูได้');if(!url)return;call('importItemsFromUrl',url).then(x=>{D=x.data;render();alert('นำเข้าแล้ว '+x.added+' รายการ และข้าม '+x.skipped+' รายการ')})}function importCsv(file){if(!file)return;const r=new FileReader();r.onload=e=>{call('importItemsFromText',e.target.result).then(x=>{D=x.data;render();alert('นำเข้าแล้ว '+x.added+' รายการ และข้าม '+x.skipped+' รายการ')})};r.readAsText(file,'UTF-8')}function openItem(x={}){ const code=x.Code||D.nextItemCode||'0001';$('modalTitle').textContent=x.ItemID?'แก้ไขพัสดุ':'เพิ่มพัสดุ';$('modalBody').innerHTML=`<div class="form"><label>รหัสพัสดุ (อัตโนมัติ 4 หลัก)<input id="fCode" value="${esc(code)}"></label><label>ชื่อรายการ<input id="fName" value="${esc(x.Name)}"></label><label>หมวดหมู่<select id="fCat">${['กระดาษ','อุปกรณ์เขียนและลบ','แฟ้มและซอง','อุปกรณ์หนีบและเย็บ','กาวและเทป','อุปกรณ์ตัดและวัด','ตรายางและหมึก','ไอทีและอิเล็กทรอนิกส์','สมุดและเบ็ดเตล็ด','อุปกรณ์จัดเก็บเอกสาร','อื่นๆ'].map(c=>`<option value="${c}"${(x.Category||'อื่นๆ')===c?' selected':''}>${c}</option>`).join('')}</select></label><label>หน่วยนับ<input id="fUnit" value="${esc(x.Unit||'ชิ้น')}"></label><label>จำนวนคงเหลือ<input id="fQty" type="number" value="${x.Quantity||0}"></label><label>จุดแจ้งเตือนขั้นต่ำ<input id="fMin" type="number" value="${x.MinStock||5}"></label><label>ราคาต่อหน่วย<input id="fPrice" type="number" value="${x.Price||0}"></label><label>สถานที่จัดเก็บ<input id="fLoc" value="${esc(x.Location)}"></label><label>ประเภท<select id="fType"><option value="พัสดุ" ${x.Type!=='ครุภัณฑ์'?'selected':''}>พัสดุ</option><option value="ครุภัณฑ์" ${x.Type==='ครุภัณฑ์'?'selected':''}>ครุภัณฑ์</option></select></label><label class="full">หมายเหตุ<textarea id="fNote">${esc(x.Notes)}</textarea></label></div><div class="actions"><button class="secondary" onclick="closeM()">ยกเลิก</button><button onclick="saveItem()">บันทึก</button></div>`;$('modal').classList.add('on');window.edit=x}function saveItem(){let x={ItemID:window.edit.ItemID,Code:$('fCode').value,Name:$('fName').value,Category:$('fCat').value,Unit:$('fUnit').value,Quantity:$('fQty').value,MinStock:$('fMin').value,Price:$('fPrice').value,Location:$('fLoc').value,Type:$('fType').value,Notes:$('fNote').value};call('saveItem',x).then(d=>{D=d;closeM();render()})}
 let txnType='IN',txnCart=[];
@@ -12,4 +394,86 @@ function drawTxn(){const adj=txnType==='ADJUST',isIN=txnType==='IN';$('modalTitl
 function drawCart(){const el=$('tCart');if(!el)return;if(!txnCart.length){el.innerHTML='<div style="padding:12px;border:1px dashed #d4dbe8;border-radius:8px;color:#64748b;text-align:center">ยังไม่มีรายการ — เลือกหรือพิมพ์ชื่อรายการด้านบนแล้วกด “＋ เพิ่มลงรายการ”</div>';return}el.innerHTML='<table><tr><th>รายการ</th><th>จำนวน</th><th>คงเหลือ</th><th></th></tr>'+txnCart.map((c,i)=>`<tr><td>${esc(c.Name)}${c.New?' <span class="badge">ใหม่</span>':''}</td><td>${c.Quantity} ${esc(c.Unit)}</td><td>${c.New?'—':'<b>'+c.Stock+'</b> '+esc(c.Unit)}</td><td><button class="danger" type="button" style="padding:4px 8px" onclick="txnRemove(${i})">ลบ</button></td></tr>`).join('')+'</table><div class="actions" style="margin-top:8px"><button class="secondary" type="button" onclick="txnClear()">ล้างรายการ</button></div>';const b=$('tSave');if(b)b.textContent=`บันทึกทั้งหมด (${txnCart.length} รายการ)`}
 function txnAdd(){const q=Number($('tQty').value||0);if(!q||q<=0)return alert('กรุณาระบุจำนวนมากกว่า 0');const isNew=txnType==='IN'&&$('tNew')&&$('tNew').checked;if(isNew){const name=String($('tNewName').value||'').trim().replace(/\s+/g,' ');if(!name)return alert('กรุณาพิมพ์ชื่อรายการใหม่');const unit=String($('tNewUnit').value||'').trim()||'ชิ้น';const category=$('tNewCat').value;const exist=D.inventory.filter(x=>String(x.Name||'').trim().replace(/\s+/g,' ').toLowerCase()===name.toLowerCase())[0];if(exist){const ex=txnCart.filter(c=>!c.New&&String(c.ItemID)===String(exist.ItemID))[0];if(ex)ex.Quantity+=q;else txnCart.push({ItemID:exist.ItemID,Name:exist.Name,Unit:exist.Unit,Quantity:q,Stock:exist.Quantity});alert('มีรายการชื่อนี้อยู่ในคลังแล้ว จึงเพิ่มจำนวนให้รายการเดิม: '+exist.Name);}else{const ex=txnCart.filter(c=>c.New&&String(c.Name).toLowerCase()===name.toLowerCase())[0];if(ex)ex.Quantity+=q;else txnCart.push({New:true,Name:name,Unit:unit,Category:category,Quantity:q,Stock:0});}$('tQty').value=1;$('tNewName').value='';drawCart();return}const id=$('tItem').value,item=D.inventory.filter(x=>String(x.ItemID)===String(id))[0];if(!item)return alert('ไม่พบรายการพัสดุ');const ex=txnCart.filter(c=>!c.New&&String(c.ItemID)===String(id))[0];if(ex)ex.Quantity+=q;else txnCart.push({ItemID:item.ItemID,Name:item.Name,Unit:item.Unit,Quantity:q,Stock:item.Quantity});$('tQty').value=1;drawCart()}
 function txnRemove(i){txnCart.splice(i,1);drawCart()}
-function txnSave(){if(txnType==='ADJUST'){call('recordTransaction',{ItemID:$('tItem').value,Type:'ADJUST',Quantity:$('tQty').value,Requester:$('tReq').value,Department:$('tDept').value,Note:$('tNote').value}).then(d=>{D=d;closeM();render()});return}if(!txnCart.length)return alert('กรุณาเพิ่มรายการพัสดุอย่างน้อย 1 รายการ');const info={req:$('tReq').value,dept:$('tDept').value,note:$('tNote').value},label=txnType==='IN'?'รับเข้า':'เบิกออก';$('tSave').disabled=true;$('tSave').textContent='⏳ กำลังบันทึก...';call('recordBatch',{Type:txnType,items:txnCart.map(c=>c.New?{New:true,Name:c.Name,Unit:c.Unit,Category:c.Category,Quantity:c.Quantity}:{ItemID:c.ItemID,Quantity:c.Quantity}),Requester:info.req,Department:info.dept,Note:info.note}).then(r=>{D=r.data;txnCart=[];$('modalTitle').textContent='✅ บันทึกการ'+label+'แล้ว';$('modalBody').innerHTML=`<div style="color:#64748b;margin-bottom:8px">${label} ${r.count} รายการ · ${new Date().toLocaleString('th-TH')}</div><table><tr><th>รายการ</th><th>${label}</th><th>คงเหลือใหม่</th></tr>${(r.items||[]).map(x=>`<tr><td>${esc(x.Code)} · ${esc(x.Name)}${x.Created?' <span class="badge">สร้างใหม่</span>':''}</td><td>${r.type==='IN'?'+':'−'}${x.Quantity} ${esc(x.Unit)}</td><td><b>${x.Remaining} ${esc(x.Unit)}</b></td></tr>`).join('')}</table><div class="actions"><button onclick="closeM();render()">ตกลง</button></div>`}).catch(()=>{$('tSave').disabled=false;$('tSave').textContent=`บันทึกทั้งหมด (${txnCart.length} รายการ)`})}function openAsset(x={}){const st=x.Status||'ใช้งาน';$('modalTitle').textContent=x.AssetID?'แก้ไขครุภัณฑ์':'เพิ่มครุภัณฑ์';$('modalBody').innerHTML=`<div class="form"><label>หมายเลขรหัสครุภัณฑ์ (กรอกเอง)<input id="aCode" placeholder="กรอกหมายเลขรหัสครุภัณฑ์" value="${esc(x.AssetCode||'')}"></label><label>ชื่อครุภัณฑ์<input id="aName" value="${esc(x.Name||'')}"></label><label>หมวดหมู่<input id="aCat" value="${esc(x.Category||'ครุภัณฑ์สำนักงาน')}"></label><label>หน่วยงาน<select id="aDept"><option value="">-- เลือกหน่วยงาน --</option><option value="งานกลยุทธ์ฯ" ${x.Department==='งานกลยุทธ์ฯ'?'selected':''}>งานกลยุทธ์ฯ</option><option value="งานบริการฯ" ${x.Department==='งานบริการฯ'?'selected':''}>งานบริการฯ</option><option value="งานพัฒนาฯ" ${x.Department==='งานพัฒนาฯ'?'selected':''}>งานพัฒนาฯ</option><option value="งานสวัสดิการฯ" ${x.Department==='งานสวัสดิการฯ'?'selected':''}>งานสวัสดิการฯ</option></select></label><label>สถานที่ตั้ง<input id="aLoc" value="${esc(x.Location||'')}"></label><label>ผู้รับผิดชอบ<input id="aResp" value="${esc(x.Responsible||'')}"></label><label>สถานะ<select id="aStatus">${['ใช้งาน','ถูกยืม','ชำรุด','จำหน่าย'].map(s=>`<option value="${s}"${st===s?' selected':''}>${s}</option>`).join('')}</select></label><label>ราคาซื้อ<input id="aCost" type="number" value="${x.Cost||0}"></label><label class="full">หมายเหตุ<textarea id="aNote">${esc(x.Note||'')}</textarea></label></div><div class="actions"><button class="secondary" onclick="closeM()">ยกเลิก</button><button onclick="saveAsset()">บันทึก</button></div>`;$('modal').classList.add('on');window.editAsset=x}function saveAsset(){const code=$('aCode').value.trim(),name=$('aName').value.trim();if(!code)return alert('กรุณากรอกหมายเลขรหัสครุภัณฑ์');if(!name)return alert('กรุณากรอกชื่อครุภัณฑ์');call('saveAsset',{AssetID:window.editAsset.AssetID,AssetCode:code,Name:name,Category:$('aCat').value,Department:$('aDept').value,Location:$('aLoc').value,Responsible:$('aResp').value,Status:$('aStatus').value,Cost:$('aCost').value,Note:$('aNote').value}).then(d=>{D=d;closeM();render()})}function todayStr(){const d=new Date(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${d.getFullYear()}-${m}-${day}`}function openLoan(assetId=''){const avail=(D.assets||[]).filter(a=>a.Status!=='ถูกยืม'&&a.Status!=='ชำรุด'&&a.Status!=='จำหน่าย');if(!avail.length)return alert('ไม่มีครุภัณฑ์ที่พร้อมให้ยืม (กรุณาเพิ่มครุภัณฑ์ หรือรับคืนรายการที่ถูกยืมก่อน)');const t=todayStr();$('modalTitle').textContent='📋 บันทึกการยืมครุภัณฑ์';$('modalBody').innerHTML=`<div class="form"><label class="full">เลือกครุภัณฑ์ที่ต้องการยืม<select id="lAsset">${avail.map(a=>`<option value="${a.AssetID}"${String(a.AssetID)===String(assetId)?' selected':''}>${esc(a.AssetCode)} · ${esc(a.Name)}</option>`).join('')}</select></label><label>ชื่อผู้ยืม<input id="lBorrower" placeholder="ชื่อ-สกุล ผู้ยืม"></label><label>หน่วยงานผู้ยืม<select id="lDept"><option value="">-- เลือกหน่วยงาน --</option><option value="งานกลยุทธ์ฯ">งานกลยุทธ์ฯ</option><option value="งานบริการฯ">งานบริการฯ</option><option value="งานพัฒนาฯ">งานพัฒนาฯ</option><option value="งานสวัสดิการฯ">งานสวัสดิการฯ</option></select></label><label>วันที่ยืม<input id="lBorrowDate" type="date" value="${t}"></label><label>กำหนดคืนวันที่<input id="lDueDate" type="date" value="${t}"></label><label class="full">นำไปใช้ในงานอะไร<input id="lPurpose" placeholder="ระบุภารกิจ/โครงการ/งานที่นำไปใช้"></label><label class="full">สภาพการใช้งานก่อนยืม<select id="lCondBefore"><option value="ปกติ/พร้อมใช้งาน">ปกติ/พร้อมใช้งาน</option><option value="สมบูรณ์ดีมาก">สมบูรณ์ดีมาก</option><option value="มีรอยขีดข่วนเล็กน้อย (ใช้งานได้ปกติ)">มีรอยขีดข่วนเล็กน้อย (ใช้งานได้ปกติ)</option><option value="อื่นๆ (ระบุในหมายเหตุ)">อื่นๆ (ระบุในหมายเหตุ)</option></select></label><label class="full">หมายเหตุ / อุปกรณ์ประกอบที่ยืมไปด้วย<textarea id="lNote" placeholder="เช่น สายชาร์จ กระเป๋า เมาส์ ฯลฯ"></textarea></label></div><div class="actions"><button class="secondary" onclick="closeM()">ยกเลิก</button><button id="lSaveBtn" onclick="saveLoan()">บันทึกการยืม</button></div>`;$('modal').classList.add('on')}function saveLoan(){const borrower=$('lBorrower').value.trim(),purpose=$('lPurpose').value.trim(),bDate=$('lBorrowDate').value,dDate=$('lDueDate').value;if(!borrower)return alert('กรุณาระบุชื่อผู้ยืม');if(!bDate)return alert('กรุณาระบุวันที่ยืม');if(!dDate)return alert('กรุณาระบุวันที่กำหนดคืน');if(!purpose)return alert('กรุณาระบุว่านำไปใช้ในงานอะไร');$('lSaveBtn').disabled=true;$('lSaveBtn').textContent='⏳ กำลังบันทึก...';call('borrowAsset',{AssetID:$('lAsset').value,Borrower:borrower,Department:$('lDept').value,BorrowDate:bDate,DueDate:dDate,Purpose:purpose,ConditionBefore:$('lCondBefore').value,Note:$('lNote').value}).then(d=>{D=d;closeM();render()}).catch(()=>{$('lSaveBtn').disabled=false;$('lSaveBtn').textContent='บันทึกการยืม'})}function openReturn(loanId){const loan=(D.assetLoans||[]).find(x=>String(x.LoanID)===String(loanId));if(!loan)return alert('ไม่พบข้อมูลการยืม');const t=todayStr();$('modalTitle').textContent='🔄 บันทึกการคืนครุภัณฑ์';$('modalBody').innerHTML=`<div style="background:#f4f7fb;padding:12px;border-radius:8px;margin-bottom:12px;font-size:13px"><b>${esc(loan.AssetCode)} · ${esc(loan.AssetName)}</b><br>ผู้ยืม: <b>${esc(loan.Borrower)}</b> (${esc(loan.Department||'-')})<br>งานที่นำไปใช้: ${esc(loan.Purpose)}<br>วันที่ยืม: ${fmtDate(loan.BorrowDate)} · กำหนดคืน: ${fmtDate(loan.DueDate)}<br>สภาพก่อนยืม: <b>${esc(loan.ConditionBefore||'-')}</b></div><div class="form"><label>วันที่คืนจริง<input id="rDate" type="date" value="${t}"></label><label>คืนสิ่งที่ยืมครบหรือไม่<select id="rComplete"><option value="ครบถ้วน">ครบถ้วน</option><option value="ไม่ครบ (ระบุในหมายเหตุ)">ไม่ครบ (ระบุในหมายเหตุ)</option></select></label><label class="full">สภาพการใช้งานหลังคืน<select id="rCondAfter"><option value="ปกติ/พร้อมใช้งาน">ปกติ/พร้อมใช้งาน</option><option value="สมบูรณ์ดีมาก">สมบูรณ์ดีมาก</option><option value="มีรอยขีดข่วน/สึกหรอเล็กน้อย (ใช้งานได้)">มีรอยขีดข่วน/สึกหรอเล็กน้อย (ใช้งานได้)</option><option value="ชำรุด/ต้องซ่อมแซม">ชำรุด/ต้องซ่อมแซม</option></select></label><label class="full">หมายเหตุการคืน<textarea id="rNote" placeholder="ระบุรายการที่ขาด หรืออาการชำรุด (ถ้ามี)">${esc(loan.Note||'')}</textarea></label></div><div class="actions"><button class="secondary" onclick="closeM()">ยกเลิก</button><button id="rSaveBtn" onclick="saveReturn('${loan.LoanID}')">ยืนยันการรับคืน</button></div>`;$('modal').classList.add('on')}function saveReturn(loanId){const rDate=$('rDate').value;if(!rDate)return alert('กรุณาระบุวันที่คืน');$('rSaveBtn').disabled=true;$('rSaveBtn').textContent='⏳ กำลังบันทึก...';call('returnAsset',{LoanID:loanId,ReturnDate:rDate,ReturnedComplete:$('rComplete').value,ConditionAfter:$('rCondAfter').value,Note:$('rNote').value}).then(d=>{D=d;closeM();render()}).catch(()=>{$('rSaveBtn').disabled=false;$('rSaveBtn').textContent='ยืนยันการรับคืน'})}function closeM(){$('modal').classList.remove('on')}function setupNow(){call('setup').then(()=>{alert('สร้างแท็บระบบเรียบร้อยแล้ว');load()})}load();</script></body></html>
+function txnSave(){if(txnType==='ADJUST'){call('recordTransaction',{ItemID:$('tItem').value,Type:'ADJUST',Quantity:$('tQty').value,Requester:$('tReq').value,Department:$('tDept').value,Note:$('tNote').value}).then(d=>{D=d;closeM();render()});return}if(!txnCart.length)return alert('กรุณาเพิ่มรายการพัสดุอย่างน้อย 1 รายการ');const info={req:$('tReq').value,dept:$('tDept').value,note:$('tNote').value},label=txnType==='IN'?'รับเข้า':'เบิกออก';$('tSave').disabled=true;$('tSave').textContent='⏳ กำลังบันทึก...';call('recordBatch',{Type:txnType,items:txnCart.map(c=>c.New?{New:true,Name:c.Name,Unit:c.Unit,Category:c.Category,Quantity:c.Quantity}:{ItemID:c.ItemID,Quantity:c.Quantity}),Requester:info.req,Department:info.dept,Note:info.note}).then(r=>{D=r.data;txnCart=[];$('modalTitle').textContent='✅ บันทึกการ'+label+'แล้ว';$('modalBody').innerHTML=`<div style="color:#64748b;margin-bottom:8px">${label} ${r.count} รายการ · ${new Date().toLocaleString('th-TH')}</div><table><tr><th>รายการ</th><th>${label}</th><th>คงเหลือใหม่</th></tr>${(r.items||[]).map(x=>`<tr><td>${esc(x.Code)} · ${esc(x.Name)}${x.Created?' <span class="badge">สร้างใหม่</span>':''}</td><td>${r.type==='IN'?'+':'−'}${x.Quantity} ${esc(x.Unit)}</td><td><b>${x.Remaining} ${esc(x.Unit)}</b></td></tr>`).join('')}</table><div class="actions"><button onclick="closeM();render()">ตกลง</button></div>`}).catch(()=>{$('tSave').disabled=false;$('tSave').textContent=`บันทึกทั้งหมด (${txnCart.length} รายการ)`})}function openAsset(x={}){const st=x.Status||'ใช้งาน';$('modalTitle').textContent=x.AssetID?'แก้ไขครุภัณฑ์':'เพิ่มครุภัณฑ์';$('modalBody').innerHTML=`<div class="form"><label>หมายเลขรหัสครุภัณฑ์ (กรอกเอง)<input id="aCode" placeholder="กรอกหมายเลขรหัสครุภัณฑ์" value="${esc(x.AssetCode||'')}"></label><label>ชื่อครุภัณฑ์<input id="aName" value="${esc(x.Name||'')}"></label><label>หมวดหมู่<input id="aCat" value="${esc(x.Category||'ครุภัณฑ์สำนักงาน')}"></label><label>หน่วยงาน<select id="aDept"><option value="">-- เลือกหน่วยงาน --</option><option value="งานกลยุทธ์ฯ" ${x.Department==='งานกลยุทธ์ฯ'?'selected':''}>งานกลยุทธ์ฯ</option><option value="งานบริการฯ" ${x.Department==='งานบริการฯ'?'selected':''}>งานบริการฯ</option><option value="งานพัฒนาฯ" ${x.Department==='งานพัฒนาฯ'?'selected':''}>งานพัฒนาฯ</option><option value="งานสวัสดิการฯ" ${x.Department==='งานสวัสดิการฯ'?'selected':''}>งานสวัสดิการฯ</option></select></label><label>สถานที่ตั้ง<input id="aLoc" value="${esc(x.Location||'')}"></label><label>ผู้รับผิดชอบ<input id="aResp" value="${esc(x.Responsible||'')}"></label><label>สถานะ<select id="aStatus">${['ใช้งาน','ถูกยืม','ชำรุด','จำหน่าย'].map(s=>`<option value="${s}"${st===s?' selected':''}>${s}</option>`).join('')}</select></label><label>ราคาซื้อ<input id="aCost" type="number" value="${x.Cost||0}"></label><label class="full">หมายเหตุ<textarea id="aNote">${esc(x.Note||'')}</textarea></label></div><div class="actions"><button class="secondary" onclick="closeM()">ยกเลิก</button><button onclick="saveAsset()">บันทึก</button></div>`;$('modal').classList.add('on');window.editAsset=x}function saveAsset(){const code=$('aCode').value.trim(),name=$('aName').value.trim();if(!code)return alert('กรุณากรอกหมายเลขรหัสครุภัณฑ์');if(!name)return alert('กรุณากรอกชื่อครุภัณฑ์');call('saveAsset',{AssetID:window.editAsset.AssetID,AssetCode:code,Name:name,Category:$('aCat').value,Department:$('aDept').value,Location:$('aLoc').value,Responsible:$('aResp').value,Status:$('aStatus').value,Cost:$('aCost').value,Note:$('aNote').value}).then(d=>{D=d;closeM();render()})}function todayStr(){const d=new Date(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${d.getFullYear()}-${m}-${day}`}function openLoan(assetId=''){const avail=(D.assets||[]).filter(a=>a.Status!=='ถูกยืม'&&a.Status!=='ชำรุด'&&a.Status!=='จำหน่าย');if(!avail.length)return alert('ไม่มีครุภัณฑ์ที่พร้อมให้ยืม (กรุณาเพิ่มครุภัณฑ์ หรือรับคืนรายการที่ถูกยืมก่อน)');const t=todayStr();$('modalTitle').textContent='📋 บันทึกการยืมครุภัณฑ์';$('modalBody').innerHTML=`<div class="form"><label class="full">เลือกครุภัณฑ์ที่ต้องการยืม<select id="lAsset">${avail.map(a=>`<option value="${a.AssetID}"${String(a.AssetID)===String(assetId)?' selected':''}>${esc(a.AssetCode)} · ${esc(a.Name)}</option>`).join('')}</select></label><label>ชื่อผู้ยืม<input id="lBorrower" placeholder="ชื่อ-สกุล ผู้ยืม"></label><label>หน่วยงานผู้ยืม<select id="lDept"><option value="">-- เลือกหน่วยงาน --</option><option value="งานกลยุทธ์ฯ">งานกลยุทธ์ฯ</option><option value="งานบริการฯ">งานบริการฯ</option><option value="งานพัฒนาฯ">งานพัฒนาฯ</option><option value="งานสวัสดิการฯ">งานสวัสดิการฯ</option></select></label><label>วันที่ยืม<input id="lBorrowDate" type="date" value="${t}"></label><label>กำหนดคืนวันที่<input id="lDueDate" type="date" value="${t}"></label><label class="full">นำไปใช้ในงานอะไร<input id="lPurpose" placeholder="ระบุภารกิจ/โครงการ/งานที่นำไปใช้"></label><label class="full">สภาพการใช้งานก่อนยืม<select id="lCondBefore"><option value="ปกติ/พร้อมใช้งาน">ปกติ/พร้อมใช้งาน</option><option value="สมบูรณ์ดีมาก">สมบูรณ์ดีมาก</option><option value="มีรอยขีดข่วนเล็กน้อย (ใช้งานได้ปกติ)">มีรอยขีดข่วนเล็กน้อย (ใช้งานได้ปกติ)</option><option value="อื่นๆ (ระบุในหมายเหตุ)">อื่นๆ (ระบุในหมายเหตุ)</option></select></label><label class="full">หมายเหตุ / อุปกรณ์ประกอบที่ยืมไปด้วย<textarea id="lNote" placeholder="เช่น สายชาร์จ กระเป๋า เมาส์ ฯลฯ"></textarea></label></div><div class="actions"><button class="secondary" onclick="closeM()">ยกเลิก</button><button id="lSaveBtn" onclick="saveLoan()">บันทึกการยืม</button></div>`;$('modal').classList.add('on')}function saveLoan(){const borrower=$('lBorrower').value.trim(),purpose=$('lPurpose').value.trim(),bDate=$('lBorrowDate').value,dDate=$('lDueDate').value;if(!borrower)return alert('กรุณาระบุชื่อผู้ยืม');if(!bDate)return alert('กรุณาระบุวันที่ยืม');if(!dDate)return alert('กรุณาระบุวันที่กำหนดคืน');if(!purpose)return alert('กรุณาระบุว่านำไปใช้ในงานอะไร');$('lSaveBtn').disabled=true;$('lSaveBtn').textContent='⏳ กำลังบันทึก...';call('borrowAsset',{AssetID:$('lAsset').value,Borrower:borrower,Department:$('lDept').value,BorrowDate:bDate,DueDate:dDate,Purpose:purpose,ConditionBefore:$('lCondBefore').value,Note:$('lNote').value}).then(d=>{D=d;closeM();render()}).catch(()=>{$('lSaveBtn').disabled=false;$('lSaveBtn').textContent='บันทึกการยืม'})}function openReturn(loanId){const loan=(D.assetLoans||[]).find(x=>String(x.LoanID)===String(loanId));if(!loan)return alert('ไม่พบข้อมูลการยืม');const t=todayStr();$('modalTitle').textContent='🔄 บันทึกการคืนครุภัณฑ์';$('modalBody').innerHTML=`<div style="background:#f4f7fb;padding:12px;border-radius:8px;margin-bottom:12px;font-size:13px"><b>${esc(loan.AssetCode)} · ${esc(loan.AssetName)}</b><br>ผู้ยืม: <b>${esc(loan.Borrower)}</b> (${esc(loan.Department||'-')})<br>งานที่นำไปใช้: ${esc(loan.Purpose)}<br>วันที่ยืม: ${fmtDate(loan.BorrowDate)} · กำหนดคืน: ${fmtDate(loan.DueDate)}<br>สภาพก่อนยืม: <b>${esc(loan.ConditionBefore||'-')}</b></div><div class="form"><label>วันที่คืนจริง<input id="rDate" type="date" value="${t}"></label><label>คืนสิ่งที่ยืมครบหรือไม่<select id="rComplete"><option value="ครบถ้วน">ครบถ้วน</option><option value="ไม่ครบ (ระบุในหมายเหตุ)">ไม่ครบ (ระบุในหมายเหตุ)</option></select></label><label class="full">สภาพการใช้งานหลังคืน<select id="rCondAfter"><option value="ปกติ/พร้อมใช้งาน">ปกติ/พร้อมใช้งาน</option><option value="สมบูรณ์ดีมาก">สมบูรณ์ดีมาก</option><option value="มีรอยขีดข่วน/สึกหรอเล็กน้อย (ใช้งานได้)">มีรอยขีดข่วน/สึกหรอเล็กน้อย (ใช้งานได้)</option><option value="ชำรุด/ต้องซ่อมแซม">ชำรุด/ต้องซ่อมแซม</option></select></label><label class="full">หมายเหตุการคืน<textarea id="rNote" placeholder="ระบุรายการที่ขาด หรืออาการชำรุด (ถ้ามี)">${esc(loan.Note||'')}</textarea></label></div><div class="actions"><button class="secondary" onclick="closeM()">ยกเลิก</button><button id="rSaveBtn" onclick="saveReturn('${loan.LoanID}')">ยืนยันการรับคืน</button></div>`;$('modal').classList.add('on')}function saveReturn(loanId){const rDate=$('rDate').value;if(!rDate)return alert('กรุณาระบุวันที่คืน');$('rSaveBtn').disabled=true;$('rSaveBtn').textContent='⏳ กำลังบันทึก...';call('returnAsset',{LoanID:loanId,ReturnDate:rDate,ReturnedComplete:$('rComplete').value,ConditionAfter:$('rCondAfter').value,Note:$('rNote').value}).then(d=>{D=d;closeM();render()}).catch(()=>{$('rSaveBtn').disabled=false;$('rSaveBtn').textContent='ยืนยันการรับคืน'})}function closeM(){$('modal').classList.remove('on')}function setupNow(){call('setup').then(()=>{alert('สร้างแท็บระบบเรียบร้อยแล้ว');load()})}load();</script>
+<script>
+(function () {
+  var PALETTE = ['#f09c18', '#c9563a', '#e0a33c', '#8f2f1f', '#d98a5f', '#6d4c41', '#a1887f'];
+  var fmt = function (n) { return Number(n || 0).toLocaleString('th-TH'); };
+
+  function donut() {
+    var el = document.getElementById('donutChart');
+    if (!el) return;
+    var entries = Object.entries(D.categories || {}).filter(function (e) { return Number(e[1]) > 0; })
+      .sort(function (a, b) { return b[1] - a[1]; });
+    var total = entries.reduce(function (s, e) { return s + Number(e[1]); }, 0);
+    if (!total) { el.innerHTML = '<div class="empty">ยังไม่มีข้อมูล</div>'; return; }
+    var parts = entries.slice(0, 6);
+    var rest = entries.slice(6).reduce(function (s, e) { return s + Number(e[1]); }, 0);
+    if (rest > 0) parts.push(['อื่นๆ', rest]);
+    var R = 62, C = 2 * Math.PI * R, off = 0;
+    var segs = parts.map(function (p, i) {
+      var len = C * (Number(p[1]) / total);
+      var s = '<circle cx="80" cy="80" r="' + R + '" fill="none" stroke="' + PALETTE[i % PALETTE.length] +
+        '" stroke-width="24" stroke-dasharray="' + len + ' ' + (C - len) + '" stroke-dashoffset="' + (-off) +
+        '" transform="rotate(-90 80 80)"></circle>';
+      off += len;
+      return s;
+    }).join('');
+    el.innerHTML = '<svg viewBox="0 0 160 160" role="img" aria-label="สัดส่วนคงเหลือตามหมวดหมู่">' + segs +
+      '<text x="80" y="77" text-anchor="middle" class="dnum">' + fmt(total) + '</text>' +
+      '<text x="80" y="94" text-anchor="middle" class="dsub">ชิ้นรวม</text></svg>';
+  }
+
+  function bars() {
+    var el = document.getElementById('barChart');
+    if (!el) return;
+    var list = (D.inventory || []).slice().sort(function (a, b) { return Number(b.Quantity) - Number(a.Quantity); }).slice(0, 8);
+    if (!list.length) { el.innerHTML = '<div class="empty">ยังไม่มีข้อมูล</div>'; return; }
+    var max = Math.max.apply(null, list.map(function (x) { return Number(x.Quantity) || 0; }).concat([1]));
+    el.innerHTML = list.map(function (x) {
+      var w = Math.max(3, (Number(x.Quantity) || 0) / max * 100);
+      return '<div class="barrow"><span class="n">' + esc(x.Name) + '</span>' +
+        '<span class="q">' + fmt(x.Quantity) + ' ' + esc(x.Unit || '') + '</span>' +
+        '<span class="t"><i style="width:' + w + '%"></i></span></div>';
+    }).join('');
+  }
+
+  function gauge() {
+    var el = document.getElementById('gaugeChart');
+    if (!el) return;
+    var s = D.summary || {};
+    var items = Number(s.items) || 0, low = Number(s.low) || 0;
+    var ok = Math.max(0, items - low);
+    var pct = items ? Math.round(ok / items * 100) : 0;
+    el.innerHTML =
+      '<svg viewBox="0 0 200 118" class="gauge" role="img" aria-label="สัดส่วนรายการพร้อมใช้งาน">' +
+      '<defs><linearGradient id="gg" x1="0" y1="0" x2="1" y2="0">' +
+      '<stop offset="0" stop-color="#f6b53f"/><stop offset="1" stop-color="#b44830"/>' +
+      '</linearGradient></defs>' +
+      '<path d="M22 100 A78 78 0 0 1 178 100" pathLength="100" fill="none" stroke="#f1e7df" stroke-width="16" stroke-linecap="round"/>' +
+      '<path d="M22 100 A78 78 0 0 1 178 100" pathLength="100" fill="none" stroke="url(#gg)" stroke-width="16" stroke-linecap="round" stroke-dasharray="' + pct + ' 100"/>' +
+      '<text x="100" y="88" text-anchor="middle" class="gnum">' + pct + '%</text>' +
+      '<text x="100" y="105" text-anchor="middle" class="gsub">รายการพร้อมใช้งาน</text></svg>' +
+      '<div class="ministat"><span><b class="ok">' + fmt(ok) + '</b>ปกติ</span>' +
+      '<span><b class="warn">' + fmt(low) + '</b>ใกล้หมด</span>' +
+      '<span><b>' + fmt(items) + '</b>รวม</span></div>';
+  }
+
+  function stamp() {
+    var el = document.getElementById('stamp');
+    if (!el) return;
+    var t = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    el.textContent = 'อัปเดต ' + t + ' น.';
+  }
+
+  function draw() {
+    try { donut(); bars(); gauge(); stamp(); } catch (e) { console.warn(e); }
+  }
+
+  var base = render;
+  render = function () { base.apply(null, arguments); draw(); };
+  draw();
+})();
+</script>
+</body>
+</html>
