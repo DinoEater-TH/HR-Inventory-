@@ -1,15 +1,793 @@
-<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>คลังพัสดุและครุภัณฑ์</title><style>
-:root{--blue:#1455d9;--bg:#f4f7fb;--text:#172033;--muted:#64748b;--red:#dc2626;--green:#078447}*{box-sizing:border-box}body{margin:0;background:var(--bg);font:14px Arial,sans-serif;color:var(--text)}header{background:linear-gradient(120deg,#103b9b,#2874e8);color:#fff;padding:24px max(18px,calc((100% - 1200px)/2));display:flex;justify-content:space-between;align-items:center}h1{font-size:24px;margin:0}header small{opacity:.8}.wrap{max-width:1200px;margin:auto;padding:20px}.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.card,.panel{background:#fff;border-radius:14px;padding:18px;box-shadow:0 3px 15px #17203312}.card b{font-size:25px;display:block;margin-top:7px}.label{color:var(--muted);font-size:12px}.red{color:var(--red)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}.panel h2{font-size:17px;margin:0 0 14px}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}button{border:0;border-radius:8px;background:var(--blue);color:white;padding:9px 14px;cursor:pointer}button.secondary{background:#e8eefc;color:#19449d}button.danger{background:#fee2e2;color:#a71919}input,select,textarea{border:1px solid #d4dbe8;border-radius:7px;padding:9px;background:#fff;min-width:0;width:100%}table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:9px 7px;border-bottom:1px solid #edf0f5;text-align:left}th{color:var(--muted);background:#fafbfe}.tablewrap{overflow:auto;max-height:430px}.badge{background:#e8f7ef;color:var(--green);padding:3px 7px;border-radius:20px;font-size:11px}.badge.warn{background:#fff1db;color:#a15c00}.modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;padding:18px}.modal.on{display:flex}.dialog{background:#fff;border-radius:14px;max-width:560px;width:100%;padding:20px;max-height:88vh;overflow:auto}.form{display:grid;grid-template-columns:1fr 1fr;gap:10px}.form label{font-size:12px;color:var(--muted)}.form label.full{grid-column:1/-1}.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}.bar{height:9px;background:#dce7ff;border-radius:10px;margin-top:6px}.bar i{display:block;height:100%;background:var(--blue);border-radius:10px}.empty{color:var(--muted);padding:18px;text-align:center}@media(max-width:800px){.cards{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.wrap{padding:12px}header{padding:18px 12px}.form{grid-template-columns:1fr}.form label.full{grid-column:auto}}
-</style></head><body><header><div><h1>📦 Office Inventory Dashboard</h1><small>ระบบแดชบอร์ดคลังพัสดุและครุภัณฑ์สำนักงาน</small></div><button onclick="load()">รีเฟรชข้อมูล</button></header><main class="wrap"><section class="cards"><div class="card"><span class="label">รายการพัสดุ</span><b id="items">-</b></div><div class="card"><span class="label">จำนวนคงเหลือรวม</span><b id="qty">-</b></div><div class="card"><span class="label">มูลค่าคงคลัง</span><b id="value">-</b></div><div class="card"><span class="label">ครุภัณฑ์</span><b id="assets">-</b></div><div class="card"><span class="label">ใกล้หมด</span><b class="red" id="low">-</b></div></section><div class="toolbar"><button onclick="openItem()">＋ เพิ่มพัสดุ</button><button class="secondary" onclick="document.getElementById('fileInput').click()">นำเข้าจากไฟล์ CSV</button><button class="secondary" onclick="importUrl()">นำเข้าจากลิงก์</button><input id="fileInput" type="file" accept=".csv,text/csv" style="display:none" onchange="importCsv(this.files[0])"><button class="secondary" onclick="openTxn()">↕ รับเข้า / เบิกออก</button><button class="secondary" onclick="openAsset()">＋ เพิ่มครุภัณฑ์</button><button class="secondary" onclick="openLoan()">📋 ยืมครุภัณฑ์</button><button class="secondary" onclick="setupNow()">ตั้งค่าระบบครั้งแรก</button></div><section class="grid"><div class="panel"><h2>รายการใกล้หมด</h2><div id="lowTable"></div></div><div class="panel"><h2>สรุปตามหมวดหมู่</h2><div id="categories"></div></div></section><section class="panel" style="margin-top:16px"><h2>คลังพัสดุ <input id="search" placeholder="ค้นหาชื่อ / รหัส / หมวดหมู่" oninput="renderInventory()" style="max-width:290px;float:right"></h2><div class="tablewrap" id="inventoryTable"></div></section><section class="panel" style="margin-top:16px"><h2>ทะเบียนครุภัณฑ์ <button class="secondary" style="float:right;padding:6px 12px" onclick="openLoan()">📋 ยืมครุภัณฑ์</button></h2><div class="tablewrap" id="assetTable"></div></section><section class="panel" style="margin-top:16px"><h2>ประวัติการยืม–คืนครุภัณฑ์</h2><div class="tablewrap" id="loanTable"></div></section></main><div class="modal" id="modal"><div class="dialog"><h2 id="modalTitle"></h2><div id="modalBody"></div></div></div><script src="config.js?v=13"></script><script>
-let D={inventory:[],assets:[],assetLoans:[],transactions:[]};const $=id=>document.getElementById(id);const esc=x=>String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));const API=window.API_URL||'';function call(fn,arg){const data=arg===undefined?null:arg;const read=['getDashboard','getItemList','getNextItemCode','getNextAssetCode'].indexOf(fn)>=0;const p=read?apiGet(fn,data):apiPost(fn,data);return p.catch(e=>{alert(e.message||e);throw e})}function apiPost(fn,data){return fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:fn,data:data})}).then(r=>r.json()).then(j=>{if(!j.ok){const e=new Error(j.error||'เซิร์ฟเวอร์ขัดข้อง');e.biz=1;throw e}return j.result})}function apiGet(fn,data){const url=API+'?action='+encodeURIComponent(fn)+'&data='+encodeURIComponent(JSON.stringify(data));const one=()=>fetch(url).then(r=>r.json()).then(j=>{if(!j.ok){const e=new Error(j.error||'เซิร์ฟเวอร์ขัดข้อง');e.biz=1;throw e}return j.result});return one().catch(e=>{if(e&&e.biz)throw e;return jsonp(fn,data)})}function jsonp(fn,data){return new Promise((res,rej)=>{const cb='__apicb'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);const s=document.createElement('script');const clean=()=>{try{delete window[cb]}catch(_){window[cb]=undefined}s.remove()};window[cb]=j=>{clean();if(!j||!j.ok)rej(new Error(j&&j.error?j.error:'ข้อผิดพลาดจากเซิร์ฟเวอร์'));else res(j.result)};s.onerror=()=>{clean();rej(new Error('ติดต่อเซิร์ฟเวอร์ไม่ได้'))};s.src=API+'?callback='+cb+'&action='+encodeURIComponent(fn)+'&data='+encodeURIComponent(JSON.stringify(data));document.body.appendChild(s)})}function load(){call('getDashboard').then(d=>{D=d;render()})}function render(){const s=D.summary||{};$('items').textContent=s.items||0;$('qty').textContent=(s.quantity||0).toLocaleString();$('value').textContent=(s.value||0).toLocaleString(undefined,{maximumFractionDigits:2})+' ฿';$('assets').textContent=s.assets||0;$('low').textContent=s.low||0;renderInventory();renderAssets();renderLoans();$('lowTable').innerHTML=D.low?.length?'<table><tr><th>รายการ</th><th>เหลือ</th><th>ขั้นต่ำ</th></tr>'+D.low.map(x=>`<tr><td>${esc(x.Name)}</td><td class="red">${x.Quantity} ${esc(x.Unit)}</td><td>${x.MinStock}</td></tr>`).join('')+'</table>':'<div class="empty">ไม่มีรายการใกล้หมด</div>';let cs=D.categories||{},max=Math.max(1,...Object.values(cs));$('categories').innerHTML=Object.entries(cs).map(([k,v])=>`<div>${esc(k)} <b style="float:right">${v}</b><div class="bar"><i style="width:${v/max*100}%"></i></div></div>`).join('')||'<div class="empty">ยังไม่มีข้อมูล</div>'}function renderInventory(){let q=($('search').value||'').toLowerCase(),a=D.inventory.filter(x=>[x.Name,x.Code,x.Category].join(' ').toLowerCase().includes(q));$('inventoryTable').innerHTML=a.length?'<table><tr><th>รหัส</th><th>รายการ</th><th>หมวดหมู่</th><th>คงเหลือ</th><th>สถานที่</th><th></th></tr>'+a.map(x=>`<tr><td>${esc(x.Code)}</td><td><b>${esc(x.Name)}</b><br><span class="label">${esc(x.Type)}</span></td><td>${esc(x.Category)}</td><td>${x.Quantity} ${esc(x.Unit)} ${Number(x.Quantity)<=Number(x.MinStock)?'<span class="badge warn">ใกล้หมด</span>':''}</td><td>${esc(x.Location)}</td><td><button class="secondary" onclick='openItem(${JSON.stringify(x)})'>แก้ไข</button> <button class='danger' onclick="removeRecord('${x.ItemID||x.AssetID}')">ลบ</button></td></tr>`).join('')+'</table>':'<div class="empty">ไม่พบข้อมูล</div>'}function renderAssets(){$('assetTable').innerHTML=D.assets.length?'<table><tr><th>รหัสครุภัณฑ์</th><th>รายการ</th><th>หน่วยงาน</th><th>สถานที่</th><th>ผู้รับผิดชอบ</th><th>สถานะ</th><th></th></tr>'+D.assets.map(x=>{const actLoan=(D.assetLoans||[]).find(l=>String(l.AssetID)===String(x.AssetID)&&l.Status==='กำลังยืม');const badgeCls=x.Status==='ถูกยืม'||x.Status==='ชำรุด'?'badge warn':'badge';const loanBtn=x.Status==='ถูกยืม'&&actLoan?`<button onclick="openReturn('${actLoan.LoanID}')">รับคืน</button>`:(x.Status==='ใช้งาน'||!x.Status?`<button class="secondary" onclick="openLoan('${x.AssetID}')">ยืม</button>`:'');return `<tr><td><b>${esc(x.AssetCode)}</b></td><td>${esc(x.Name)}</td><td>${esc(x.Department)}</td><td>${esc(x.Location)}</td><td>${esc(x.Responsible)}</td><td><span class="${badgeCls}">${esc(x.Status||'ใช้งาน')}</span>${actLoan?`<br><small class="label">ผู้ยืม: ${esc(actLoan.Borrower)}</small>`:''}</td><td>${loanBtn} <button class="secondary" onclick='openAsset(${JSON.stringify(x)})'>แก้ไข</button> <button class='danger' onclick="removeRecord('${x.AssetID}')">ลบ</button></td></tr>`}).join('')+'</table>':'<div class="empty">ยังไม่มีข้อมูลครุภัณฑ์</div>'}function fmtDate(v){if(!v)return '-';const d=new Date(v);return isNaN(d)?esc(v):d.toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'})}function renderLoans(){const list=D.assetLoans||[];$('loanTable').innerHTML=list.length?'<table><tr><th>รหัส / ครุภัณฑ์</th><th>ผู้ยืม (หน่วยงาน)</th><th>นำไปใช้ในงาน</th><th>วันที่ยืม → กำหนดคืน</th><th>สภาพก่อนยืม</th><th>การคืน / สภาพหลังคืน</th><th>สถานะ</th><th></th></tr>'+list.map(x=>`<tr><td><b>${esc(x.AssetCode)}</b><br><span class="label">${esc(x.AssetName)}</span></td><td><b>${esc(x.Borrower)}</b>${x.Department?`<br><span class="label">${esc(x.Department)}</span>`:''}</td><td>${esc(x.Purpose)}</td><td>ยืม: ${fmtDate(x.BorrowDate)}<br>กำหนดคืน: ${fmtDate(x.DueDate)}${x.ReturnDate?`<br><b>คืนจริง: ${fmtDate(x.ReturnDate)}</b>`:''}</td><td>${esc(x.ConditionBefore||'-')}</td><td>${x.Status==='คืนแล้ว'?`<b>${esc(x.ReturnedComplete||'-')}</b><br><span class="label">สภาพ: ${esc(x.ConditionAfter||'-')}</span>`:'-'}${x.Note?`<br><small class="label">หมายเหตุ: ${esc(x.Note)}</small>`:''}</td><td><span class="${x.Status==='กำลังยืม'?'badge warn':'badge'}">${esc(x.Status)}</span></td><td>${x.Status==='กำลังยืม'?`<button onclick="openReturn('${x.LoanID}')">บันทึกคืน</button> `:''}<button class="danger" onclick="removeRecord('${x.LoanID}')">ลบ</button></td></tr>`).join('')+'</table>':'<div class="empty">ยังไม่มีประวัติการยืม–คืนครุภัณฑ์</div>'}
-function removeRecord(id){if(!confirm('ยืนยันการลบรายการนี้?'))return;const s=String(id);const fn=s.indexOf('IT')===0?'deleteItem':(s.indexOf('LN')===0?'deleteAssetLoan':'deleteAsset');call(fn,{id:id}).then(d=>{D=d;render()}).catch(e=>alert(e.message||'เกิดข้อผิดพลาด'))}function importUrl(){const url=prompt('วางลิงก์ CSV หรือ Google Sheet ที่แชร์เป็นผู้มีลิงก์ดูได้');if(!url)return;call('importItemsFromUrl',url).then(x=>{D=x.data;render();alert('นำเข้าแล้ว '+x.added+' รายการ และข้าม '+x.skipped+' รายการ')})}function importCsv(file){if(!file)return;const r=new FileReader();r.onload=e=>{call('importItemsFromText',e.target.result).then(x=>{D=x.data;render();alert('นำเข้าแล้ว '+x.added+' รายการ และข้าม '+x.skipped+' รายการ')})};r.readAsText(file,'UTF-8')}function openItem(x={}){ const code=x.Code||D.nextItemCode||'0001';$('modalTitle').textContent=x.ItemID?'แก้ไขพัสดุ':'เพิ่มพัสดุ';$('modalBody').innerHTML=`<div class="form"><label>รหัสพัสดุ (อัตโนมัติ 4 หลัก)<input id="fCode" value="${esc(code)}"></label><label>ชื่อรายการ<input id="fName" value="${esc(x.Name)}"></label><label>หมวดหมู่<select id="fCat">${['กระดาษ','อุปกรณ์เขียนและลบ','แฟ้มและซอง','อุปกรณ์หนีบและเย็บ','กาวและเทป','อุปกรณ์ตัดและวัด','ตรายางและหมึก','ไอทีและอิเล็กทรอนิกส์','สมุดและเบ็ดเตล็ด','อุปกรณ์จัดเก็บเอกสาร','อื่นๆ'].map(c=>`<option value="${c}"${(x.Category||'อื่นๆ')===c?' selected':''}>${c}</option>`).join('')}</select></label><label>หน่วยนับ<input id="fUnit" value="${esc(x.Unit||'ชิ้น')}"></label><label>จำนวนคงเหลือ<input id="fQty" type="number" value="${x.Quantity||0}"></label><label>จุดแจ้งเตือนขั้นต่ำ<input id="fMin" type="number" value="${x.MinStock||5}"></label><label>ราคาต่อหน่วย<input id="fPrice" type="number" value="${x.Price||0}"></label><label>สถานที่จัดเก็บ<input id="fLoc" value="${esc(x.Location)}"></label><label>ประเภท<select id="fType"><option value="พัสดุ" ${x.Type!=='ครุภัณฑ์'?'selected':''}>พัสดุ</option><option value="ครุภัณฑ์" ${x.Type==='ครุภัณฑ์'?'selected':''}>ครุภัณฑ์</option></select></label><label class="full">หมายเหตุ<textarea id="fNote">${esc(x.Notes)}</textarea></label></div><div class="actions"><button class="secondary" onclick="closeM()">ยกเลิก</button><button onclick="saveItem()">บันทึก</button></div>`;$('modal').classList.add('on');window.edit=x}function saveItem(){let x={ItemID:window.edit.ItemID,Code:$('fCode').value,Name:$('fName').value,Category:$('fCat').value,Unit:$('fUnit').value,Quantity:$('fQty').value,MinStock:$('fMin').value,Price:$('fPrice').value,Location:$('fLoc').value,Type:$('fType').value,Notes:$('fNote').value};call('saveItem',x).then(d=>{D=d;closeM();render()})}
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>คลังพัสดุและครุภัณฑ์ - Space Dashboard</title>
+<style>
+/* ===== SPACE THEME - Quazar Style ===== */
+:root {
+  --space-dark: #0a1628;
+  --space-mid: #1a3a6c;
+  --space-light: #2a5a9c;
+  --cyan: #00d4ff;
+  --cyan-dark: #00b4d8;
+  --cyan-glow: rgba(0, 212, 255, 0.4);
+  --text: #e0f7ff;
+  --text-dim: #8ab4d8;
+  --panel-bg: rgba(10, 30, 60, 0.7);
+  --card-bg: rgba(20, 50, 90, 0.6);
+  --border: rgba(0, 212, 255, 0.2);
+  --red: #ff4757;
+  --green: #2ed573;
+  --orange: #ffa502;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  background: var(--space-dark);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Star field background */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: 
+    radial-gradient(2px 2px at 20% 30%, white, transparent),
+    radial-gradient(2px 2px at 60% 70%, white, transparent),
+    radial-gradient(1px 1px at 50% 50%, white, transparent),
+    radial-gradient(1px 1px at 80% 10%, white, transparent),
+    radial-gradient(2px 2px at 90% 60%, white, transparent),
+    radial-gradient(1px 1px at 33% 80%, white, transparent),
+    radial-gradient(1px 1px at 15% 90%, white, transparent);
+  background-size: 200% 200%;
+  animation: twinkle 15s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+}
+
+/* Nebula effect */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: 
+    radial-gradient(ellipse at 20% 50%, rgba(0, 100, 200, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(0, 180, 255, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(100, 0, 200, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Header - Quazar Style */
+header {
+  position: relative;
+  background: linear-gradient(180deg, #0a1628 0%, #1a3a6c 100%);
+  border-bottom: 2px solid var(--cyan);
+  box-shadow: 0 0 30px var(--cyan-glow);
+  padding: 30px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 10;
+}
+
+header::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 100%;
+  background: linear-gradient(180deg, transparent, rgba(0, 212, 255, 0.1), transparent);
+  pointer-events: none;
+}
+
+header h1 {
+  font-size: 32px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #fff 0%, var(--cyan) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 0 30px var(--cyan-glow);
+  letter-spacing: 2px;
+}
+
+header small {
+  display: block;
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-top: 5px;
+  letter-spacing: 1px;
+}
+
+/* Main Content */
+.wrap {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 30px 20px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Stat Cards - Circular Icon Style */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 25px 20px;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, var(--cyan-glow) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  border-color: var(--cyan);
+  box-shadow: 0 12px 40px var(--cyan-glow);
+}
+
+.card:hover::before {
+  opacity: 0.1;
+}
+
+.card .icon-circle {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 15px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--cyan) 0%, var(--cyan-dark) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  box-shadow: 0 0 20px var(--cyan-glow);
+  position: relative;
+  z-index: 1;
+}
+
+.card .label {
+  font-size: 12px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.card b {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--cyan);
+  text-shadow: 0 0 10px var(--cyan-glow);
+  position: relative;
+  z-index: 1;
+}
+
+.card .red {
+  color: var(--red);
+  text-shadow: 0 0 10px rgba(255, 71, 87, 0.5);
+}
+
+/* Toolbar */
+.toolbar {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 25px 0;
+  padding: 20px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+}
+
+button {
+  border: none;
+  border-radius: 8px;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+button.primary, button:not(.secondary):not(.danger) {
+  background: linear-gradient(135deg, var(--cyan) 0%, var(--cyan-dark) 100%);
+  color: var(--space-dark);
+  box-shadow: 0 4px 15px var(--cyan-glow);
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px var(--cyan-glow);
+}
+
+button.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--cyan);
+  border: 1px solid var(--border);
+}
+
+button.secondary:hover {
+  background: rgba(0, 212, 255, 0.1);
+  border-color: var(--cyan);
+}
+
+button.danger {
+  background: linear-gradient(135deg, var(--red) 0%, #ff6b81 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(255, 71, 87, 0.4);
+}
+
+/* Panels */
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 25px;
+  margin-bottom: 25px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.panel h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--cyan);
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+/* Tables */
+.tablewrap {
+  overflow-x: auto;
+  max-height: 500px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th {
+  background: rgba(0, 212, 255, 0.1);
+  color: var(--cyan);
+  padding: 12px 10px;
+  text-align: left;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid var(--border);
+}
+
+td {
+  padding: 12px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+
+tr:hover td {
+  background: rgba(0, 212, 255, 0.05);
+}
+
+/* Badges */
+.badge {
+  background: rgba(46, 213, 115, 0.2);
+  color: var(--green);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid rgba(46, 213, 115, 0.3);
+}
+
+.badge.warn {
+  background: rgba(255, 165, 2, 0.2);
+  color: var(--orange);
+  border-color: rgba(255, 165, 2, 0.3);
+}
+
+/* Modal */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(5px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.modal.on {
+  display: flex;
+}
+
+.dialog {
+  background: linear-gradient(135deg, #1a3a6c 0%, #0a1628 100%);
+  border: 2px solid var(--cyan);
+  border-radius: 20px;
+  max-width: 600px;
+  width: 100%;
+  padding: 30px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 0 50px var(--cyan-glow);
+}
+
+.dialog h2 {
+  color: var(--cyan);
+  margin-bottom: 20px;
+  font-size: 22px;
+}
+
+/* Form */
+.form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.form label {
+  font-size: 12px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form label.full {
+  grid-column: 1 / -1;
+}
+
+input, select, textarea {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 14px;
+  margin-top: 5px;
+  transition: all 0.3s;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: 0 0 10px var(--cyan-glow);
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+/* Search */
+#search {
+  max-width: 300px;
+  float: right;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  padding: 10px 15px;
+  border-radius: 20px;
+  color: var(--text);
+}
+
+/* Empty State */
+.empty {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  header {
+    flex-direction: column;
+    text-align: center;
+    padding: 20px;
+  }
+  
+  header h1 {
+    font-size: 24px;
+  }
+  
+  .cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .form {
+    grid-template-columns: 1fr;
+  }
+  
+  .toolbar {
+    flex-direction: column;
+  }
+  
+  button {
+    width: 100%;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--space-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--cyan-dark);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cyan);
+}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>🚀 OFFICE INVENTORY</h1>
+    <small>ระบบคลังพัสดุและครุภัณฑ์อวกาศ</small>
+  </div>
+  <button onclick="load()" class="secondary">🔄 รีเฟรช</button>
+</header>
+
+<main class="wrap">
+  <!-- Stat Cards -->
+  <section class="cards">
+    <div class="card">
+      <div class="icon-circle">📦</div>
+      <div class="label">รายการพัสดุ</div>
+      <b id="items">-</b>
+    </div>
+    <div class="card">
+      <div class="icon-circle">📊</div>
+      <div class="label">จำนวนคงเหลือ</div>
+      <b id="qty">-</b>
+    </div>
+    <div class="card">
+      <div class="icon-circle">💰</div>
+      <div class="label">มูลค่าคงคลัง</div>
+      <b id="value">-</b>
+    </div>
+    <div class="card">
+      <div class="icon-circle">🖥️</div>
+      <div class="label">ครุภัณฑ์</div>
+      <b id="assets">-</b>
+    </div>
+    <div class="card">
+      <div class="icon-circle">⚠️</div>
+      <div class="label">ใกล้หมด</div>
+      <b class="red" id="low">-</b>
+    </div>
+  </section>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <button onclick="openItem()">＋ เพิ่มพัสดุ</button>
+    <button class="secondary" onclick="document.getElementById('fileInput').click()">📁 นำเข้า CSV</button>
+    <button class="secondary" onclick="importUrl()">🔗 นำเข้าลิงก์</button>
+    <input id="fileInput" type="file" accept=".csv,text/csv" style="display:none" onchange="importCsv(this.files[0])">
+    <button class="secondary" onclick="openTxn()">↕ รับเข้า/เบิกออก</button>
+    <button class="secondary" onclick="openAsset()">🖥️ เพิ่มครุภัณฑ์</button>
+    <button class="secondary" onclick="openLoan()">📋 ยืมครุภัณฑ์</button>
+    <button class="secondary" onclick="setupNow()">⚙️ ตั้งค่าระบบ</button>
+  </div>
+
+  <!-- Summary Grid -->
+  <section class="grid">
+    <div class="panel">
+      <h2>⚠️ รายการใกล้หมด</h2>
+      <div id="lowTable"></div>
+    </div>
+    <div class="panel">
+      <h2>📊 สรุปตามหมวดหมู่</h2>
+      <div id="categories"></div>
+    </div>
+  </section>
+
+  <!-- Inventory Table -->
+  <section class="panel">
+    <h2>📦 คลังพัสดุ <input id="search" placeholder="ค้นหา..." oninput="renderInventory()"></h2>
+    <div class="tablewrap" id="inventoryTable"></div>
+  </section>
+
+  <!-- Asset Table -->
+  <section class="panel">
+    <h2>🖥️ ทะเบียนครุภัณฑ์ <button class="secondary" style="float:right;padding:8px 16px" onclick="openLoan()">📋 ยืมครุภัณฑ์</button></h2>
+    <div class="tablewrap" id="assetTable"></div>
+  </section>
+
+  <!-- Loan History -->
+  <section class="panel">
+    <h2>📋 ประวัติการยืม-คืนครุภัณฑ์</h2>
+    <div class="tablewrap" id="loanTable"></div>
+  </section>
+</main>
+
+<!-- Modal -->
+<div class="modal" id="modal">
+  <div class="dialog">
+    <h2 id="modalTitle"></h2>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script src="config.js?v=13"></script>
+<script>
+let D={inventory:[],assets:[],assetLoans:[],transactions:[]};
+const $=id=>document.getElementById(id);
+const esc=x=>String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const API=window.API_URL||'';
+
+function call(fn,arg){
+  const data=arg===undefined?null:arg;
+  const read=['getDashboard','getItemList','getNextItemCode','getNextAssetCode'].indexOf(fn)>=0;
+  const p=read?apiGet(fn,data):apiPost(fn,data);
+  return p.catch(e=>{alert(e.message||e);throw e})
+}
+
+function apiPost(fn,data){
+  return fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:fn,data:data})})
+    .then(r=>r.json())
+    .then(j=>{if(!j.ok){const e=new Error(j.error||'เซิร์ฟเวอร์ขัดข้อง');e.biz=1;throw e}return j.result})
+}
+
+function apiGet(fn,data){
+  const url=API+'?action='+encodeURIComponent(fn)+'&data='+encodeURIComponent(JSON.stringify(data));
+  const one=()=>fetch(url).then(r=>r.json()).then(j=>{if(!j.ok){const e=new Error(j.error||'เซิร์ฟเวอร์ขัดข้อง');e.biz=1;throw e}return j.result});
+  return one().catch(e=>{if(e&&e.biz)throw e;return jsonp(fn,data)})
+}
+
+function jsonp(fn,data){
+  return new Promise((res,rej)=>{
+    const cb='__apicb'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+    const s=document.createElement('script');
+    const clean=()=>{try{delete window[cb]}catch(_){window[cb]=undefined}s.remove()};
+    window[cb]=j=>{clean();if(!j||!j.ok)rej(new Error(j&&j.error?j.error:'ข้อผิดพลาดจากเซิร์ฟเวอร์'));else res(j.result)};
+    s.onerror=()=>{clean();rej(new Error('ติดต่อเซิร์ฟเวอร์ไม่ได้'))};
+    s.src=API+'?callback='+cb+'&action='+encodeURIComponent(fn)+'&data='+encodeURIComponent(JSON.stringify(data));
+    document.body.appendChild(s)
+  })
+}
+
+function load(){call('getDashboard').then(d=>{D=d;render()})}
+
+function render(){
+  const s=D.summary||{};
+  $('items').textContent=s.items||0;
+  $('qty').textContent=(s.quantity||0).toLocaleString();
+  $('value').textContent=(s.value||0).toLocaleString(undefined,{maximumFractionDigits:2})+' ฿';
+  $('assets').textContent=s.assets||0;
+  $('low').textContent=s.low||0;
+  renderInventory();
+  renderAssets();
+  renderLoans();
+}
+
+function renderInventory(){
+  const q=($('search').value||'').toLowerCase();
+  const list=D.inventory.filter(x=>!q||String(x.Name).toLowerCase().indexOf(q)>=0||String(x.Code).toLowerCase().indexOf(q)>=0||String(x.Category).toLowerCase().indexOf(q)>=0);
+  $('inventoryTable').innerHTML=list.length?'<table><tr><th>รหัส</th><th>รายการ</th><th>หมวดหมู่</th><th>หน่วย</th><th>จำนวน</th><th>ขั้นต่ำ</th><th>ราคา</th><th>สถานที่</th><th>ประเภท</th><th>สถานะ</th><th></th></tr>'+list.map(x=>`<tr><td><b>${esc(x.Code)}</b></td><td>${esc(x.Name)}</td><td>${esc(x.Category)}</td><td>${esc(x.Unit)}</td><td>${x.Quantity}</td><td>${x.MinStock}</td><td>${x.Price}</td><td>${esc(x.Location)}</td><td>${esc(x.Type)}</td><td><span class="badge">${esc(x.Status)}</span></td><td><button class="secondary" onclick='openItem(${JSON.stringify(x)})'>แก้ไข</button> <button class="danger" onclick="removeRecord('${x.ItemID}')">ลบ</button></td></tr>`).join('')+'</table>':'<div class="empty">ไม่พบข้อมูล</div>'
+}
+
+function renderAssets(){
+  $('assetTable').innerHTML=D.assets.length?'<table><tr><th>รหัสครุภัณฑ์</th><th>รายการ</th><th>หน่วยงาน</th><th>สถานที่</th><th>ผู้รับผิดชอบ</th><th>สถานะ</th><th></th></tr>'+D.assets.map(x=>{const actLoan=(D.assetLoans||[]).find(l=>String(l.AssetID)===String(x.AssetID)&&l.Status==='กำลังยืม');const badgeCls=x.Status==='ถูกยืม'||x.Status==='ชำรุด'?'badge warn':'badge';const loanBtn=x.Status==='ถูกยืม'&&actLoan?`<button onclick="openReturn('${actLoan.LoanID}')">รับคืน</button>`:(x.Status==='ใช้งาน'||!x.Status?`<button class="secondary" onclick="openLoan('${x.AssetID}')">ยืม</button>`:'');return `<tr><td><b>${esc(x.AssetCode)}</b></td><td>${esc(x.Name)}</td><td>${esc(x.Department)}</td><td>${esc(x.Location)}</td><td>${esc(x.Responsible)}</td><td><span class="${badgeCls}">${esc(x.Status||'ใช้งาน')}</span>${actLoan?`<br><small style="color:var(--text-dim)">ผู้ยืม: ${esc(actLoan.Borrower)}</small>`:''}</td><td>${loanBtn} <button class="secondary" onclick='openAsset(${JSON.stringify(x)})'>แก้ไข</button> <button class="danger" onclick="removeRecord('${x.AssetID}')">ลบ</button></td></tr>`}).join('')+'</table>':'<div class="empty">ยังไม่มีข้อมูลครุภัณฑ์</div>'
+}
+
+function fmtDate(v){if(!v)return '-';const d=new Date(v);return isNaN(d)?esc(v):d.toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'})}
+
+function renderLoans(){
+  const list=D.assetLoans||[];
+  $('loanTable').innerHTML=list.length?'<table><tr><th>รหัส/ครุภัณฑ์</th><th>ผู้ยืม (หน่วยงาน)</th><th>นำไปใช้ในงาน</th><th>วันที่ยืม → กำหนดคืน</th><th>สภาพก่อนยืม</th><th>การคืน/สภาพหลังคืน</th><th>สถานะ</th><th></th></tr>'+list.map(x=>`<tr><td><b>${esc(x.AssetCode)}</b><br><small style="color:var(--text-dim)">${esc(x.AssetName)}</small></td><td><b>${esc(x.Borrower)}</b>${x.Department?`<br><small style="color:var(--text-dim)">${esc(x.Department)}</small>`:''}</td><td>${esc(x.Purpose)}</td><td>ยืม: ${fmtDate(x.BorrowDate)}<br>กำหนดคืน: ${fmtDate(x.DueDate)}${x.ReturnDate?`<br><b>คืนจริง: ${fmtDate(x.ReturnDate)}</b>`:''}</td><td>${esc(x.ConditionBefore||'-')}</td><td>${x.Status==='คืนแล้ว'?`<b>${esc(x.ReturnedComplete||'-')}</b><br><small style="color:var(--text-dim)">สภาพ: ${esc(x.ConditionAfter||'-')}</small>`:'-'}${x.Note?`<br><small style="color:var(--text-dim)">หมายเหตุ: ${esc(x.Note)}</small>`:''}</td><td><span class="${x.Status==='กำลังยืม'?'badge warn':'badge'}">${esc(x.Status)}</span></td><td>${x.Status==='กำลังยืม'?`<button onclick="openReturn('${x.LoanID}')">บันทึกคืน</button> `:''}<button class="danger" onclick="removeRecord('${x.LoanID}')">ลบ</button></td></tr>`).join('')+'</table>':'<div class="empty">ยังไม่มีประวัติการยืม-คืนครุภัณฑ์</div>'
+}
+
+function removeRecord(id){
+  if(!confirm('ยืนยันการลบรายการนี้?'))return;
+  const s=String(id);
+  const fn=s.indexOf('IT')===0?'deleteItem':(s.indexOf('LN')===0?'deleteAssetLoan':'deleteAsset');
+  call(fn,{id:id}).then(d=>{D=d;render()}).catch(e=>alert(e.message||'เกิดข้อผิดพลาด'))
+}
+
+function importUrl(){
+  const url=prompt('วางลิงก์ CSV หรือ Google Sheet ที่แชร์เป็นผู้มีลิงก์ดูได้');
+  if(!url)return;
+  call('importItemsFromUrl',url).then(x=>{D=x.data;render();alert('นำเข้าแล้ว '+x.added+' รายการ และข้าม '+x.skipped+' รายการ')})
+}
+
+function importCsv(file){
+  if(!file)return;
+  const r=new FileReader();
+  r.onload=e=>{call('importItemsFromText',e.target.result).then(x=>{D=x.data;render();alert('นำเข้าแล้ว '+x.added+' รายการ และข้าม '+x.skipped+' รายการ')})};
+  r.readAsText(file,'UTF-8')
+}
+
+function openItem(x={}){
+  const code=x.Code||D.nextItemCode||'0001';
+  $('modalTitle').textContent=x.ItemID?'แก้ไขพัสดุ':'เพิ่มพัสดุ';
+  $('modalBody').innerHTML=`<div class="form"><label>รหัสพัสดุ (อัตโนมัติ 4 หลัก)<input id="fCode" value="${esc(code)}"></label><label>ชื่อรายการ<input id="fName" value="${esc(x.Name)}"></label><label>หมวดหมู่<select id="fCat">${['กระดาษ','อุปกรณ์เขียนและลบ','แฟ้มและซอง','อุปกรณ์หนีบและเย็บ','กาวและเทป','อุปกรณ์ตัดและวัด','ตรายางและหมึก','ไอทีและอิเล็กทรอนิกส์','สมุดและเบ็ดเตล็ด','อุปกรณ์จัดเก็บเอกสาร','อื่นๆ'].map(c=>`<option value="${c}"${(x.Category||'อื่นๆ')===c?' selected':''}>${c}</option>`).join('')}</select></label><label>หน่วยนับ<input id="fUnit" value="${esc(x.Unit||'ชิ้น')}"></label><label>จำนวนคงเหลือ<input id="fQty" type="number" value="${x.Quantity||0}"></label><label>จุดแจ้งเตือนขั้นต่ำ<input id="fMin" type="number" value="${x.MinStock||5}"></label><label>ราคาต่อหน่วย<input id="fPrice" type="number" value="${x.Price||0}"></label><label>สถานที่จัดเก็บ<input id="fLoc" value="${esc(x.Location)}"></label><label>ประเภท<select id="fType"><option value="พัสดุ" ${x.Type!=='ครุภัณฑ์'?'selected':''}>พัสดุ</option><option value="ครุภัณฑ์" ${x.Type==='ครุภัณฑ์'?'selected':''}>ครุภัณฑ์</option></select></label><label>สถานะ<select id="fStatus"><option>ใช้งาน</option><option>ชำรุด</option><option>จำหน่าย</option></select></label><label class="full">หมายเหตุ<textarea id="fNote">${esc(x.Notes)}</textarea></label></div><div class="actions"><button class="secondary" onclick="closeM()">ยกเลิก</button><button onclick="saveItem()">บันทึก</button></div>`;
+  $('modal').classList.add('on');
+  window.editItem=x
+}
+
+function saveItem(){
+  call('saveItem',{ItemID:window.editItem.ItemID,Code:$('fCode').value,Name:$('fName').value,Category:$('fCat').value,Unit:$('fUnit').value,Quantity:$('fQty').value,MinStock:$('fMin').value,Price:$('fPrice').value,Location:$('fLoc').value,Type:$('fType').value,Status:$('fStatus').value,Notes:$('fNote').value}).then(d=>{D=d;closeM();render()})
+}
+
+function closeM(){$('modal').classList.remove('on')}
+
+function setupNow(){if(confirm('ตั้งค่าระบบครั้งแรก?'))call('setup').then(d=>{D=d;render();alert('ตั้งค่าเรียบร้อย')})}
+
 let txnType='IN',txnCart=[];
+
 function openTxn(){txnType='IN';txnCart=[];drawTxn();$('modal').classList.add('on')}
+
 function txnToggleNew(on){const w=$('tItemWrap'),b=$('tNewBox');if(w)w.style.display=on?'none':'';if(b)b.style.display=on?'grid':'none';if(on&&$('tNewName'))$('tNewName').focus()}
+
 function txnSetType(v){txnType=v;txnCart=[];drawTxn()}
+
 function txnClear(){txnCart=[];drawCart()}
-function drawTxn(){const adj=txnType==='ADJUST',isIN=txnType==='IN';$('modalTitle').textContent='รับเข้า / เบิกออกพัสดุ';const cats=['กระดาษ','อุปกรณ์เขียนและลบ','แฟ้มและซอง','อุปกรณ์หนีบและเย็บ','กาวและเทป','อุปกรณ์ตัดและวัด','ตรายางและหมึก','ไอทีและอิเล็กทรอนิกส์','สมุดและเบ็ดเตล็ด','อุปกรณ์จัดเก็บเอกสาร','อื่นๆ'];$('modalBody').innerHTML=`<div class="form"><label class="full">ประเภทรายการ<select id="tType" onchange="txnSetType(this.value)"><option value="IN"${isIN?' selected':''}>รับเข้าพัสดุ (เลือกได้หลายรายการ)</option><option value="OUT"${txnType==='OUT'?' selected':''}>เบิกออกพัสดุ (เลือกได้หลายรายการ)</option><option value="ADJUST"${adj?' selected':''}>ปรับยอดคงเหลือ (รายการเดียว)</option></select></label>${(!adj&&isIN)?`<label class="full" style="display:flex;align-items:center;gap:8px;background:#f4f7fb;padding:10px;border-radius:8px;font-weight:400"><input type="checkbox" id="tNew" onchange="txnToggleNew(this.checked)" style="width:auto"><span>พิมพ์ชื่อรายการใหม่ (ยังไม่มีในคลัง) — ระบบจะสร้างรหัสพัสดุให้อัตโนมัติ</span></label>`:''}<label class="full" id="tItemWrap" style="display:${(!adj&&isIN)?'none':''}">รายการพัสดุ<select id="tItem">${D.inventory.length?D.inventory.map(x=>`<option value="${x.ItemID}">${esc(x.Name)} (คงเหลือ ${x.Quantity} ${esc(x.Unit)})</option>`).join(''):'<option value="">-- ยังไม่มีรายการในคลัง --</option>'}</select></label>${(!adj&&isIN)?`<div id="tNewBox" class="form" style="display:none;grid-column:1/-1"><label class="full">ชื่อรายการใหม่<input id="tNewName" placeholder="พิมพ์ชื่อพัสดุที่ต้องการเพิ่ม เช่น ปากกาลูกลื่น สีน้ำเงิน"></label><label>หน่วยนับ<input id="tNewUnit" value="ชิ้น"></label><label>หมวดหมู่<select id="tNewCat">${cats.map(c=>`<option value="${c}"${c==='อื่นๆ'?' selected':''}>${c}</option>`).join('')}</select></label></div>`:''}<label>จำนวน<input id="tQty" type="number" min="1" value="1"></label>${adj?'':'<label style="align-self:end"><button type="button" class="secondary" style="width:100%" onclick="txnAdd()">＋ เพิ่มลงรายการ</button></label>'}</div>${adj?'':'<div id="tCart" style="margin-top:10px"></div>'}<div class="form" style="margin-top:10px"><label>ผู้รับผิดชอบ / ผู้เบิก<input id="tReq"></label><label>หน่วยงาน<select id="tDept"><option value="">-- เลือกหน่วยงาน --</option><option value="งานกลยุทธ์ฯ">งานกลยุทธ์ฯ</option><option value="งานบริการฯ">งานบริการฯ</option><option value="งานพัฒนาฯ">งานพัฒนาฯ</option><option value="งานสวัสดิการฯ">งานสวัสดิการฯ</option></select></label><label class="full">หมายเหตุ<input id="tNote"></label></div><div class="actions"><button class="secondary" onclick="closeM()">ยกเลิก</button><button id="tSave" onclick="txnSave()">${adj?'บันทึก':'บันทึกทั้งหมด'}</button></div>`;if(!adj)drawCart()}
-function drawCart(){const el=$('tCart');if(!el)return;if(!txnCart.length){el.innerHTML='<div style="padding:12px;border:1px dashed #d4dbe8;border-radius:8px;color:#64748b;text-align:center">ยังไม่มีรายการ — เลือกหรือพิมพ์ชื่อรายการด้านบนแล้วกด “＋ เพิ่มลงรายการ”</div>';return}el.innerHTML='<table><tr><th>รายการ</th><th>จำนวน</th><th>คงเหลือ</th><th></th></tr>'+txnCart.map((c,i)=>`<tr><td>${esc(c.Name)}${c.New?' <span class="badge">ใหม่</span>':''}</td><td>${c.Quantity} ${esc(c.Unit)}</td><td>${c.New?'—':'<b>'+c.Stock+'</b> '+esc(c.Unit)}</td><td><button class="danger" type="button" style="padding:4px 8px" onclick="txnRemove(${i})">ลบ</button></td></tr>`).join('')+'</table><div class="actions" style="margin-top:8px"><button class="secondary" type="button" onclick="txnClear()">ล้างรายการ</button></div>';const b=$('tSave');if(b)b.textContent=`บันทึกทั้งหมด (${txnCart.length} รายการ)`}
-function txnAdd(){const q=Number($('tQty').value||0);if(!q||q<=0)return alert('กรุณาระบุจำนวนมากกว่า 0');const isNew=txnType==='IN'&&$('tNew')&&$('tNew').checked;if(isNew){const name=String($('tNewName').value||'').trim().replace(/\s+/g,' ');if(!name)return alert('กรุณาพิมพ์ชื่อรายการใหม่');const unit=String($('tNewUnit').value||'').trim()||'ชิ้น';const category=$('tNewCat').value;const exist=D.inventory.filter(x=>String(x.Name||'').trim().replace(/\s+/g,' ').toLowerCase()===name.toLowerCase())[0];if(exist){const ex=txnCart.filter(c=>!c.New&&String(c.ItemID)===String(exist.ItemID))[0];if(ex)ex.Quantity+=q;else txnCart.push({ItemID:exist.ItemID,Name:exist.Name,Unit:exist.Unit,Quantity:q,Stock:exist.Quantity});alert('มีรายการชื่อนี้อยู่ในคลังแล้ว จึงเพิ่มจำนวนให้รายการเดิม: '+exist.Name);}else{const ex=txnCart.filter(c=>c.New&&String(c.Name).toLowerCase()===name.toLowerCase())[0];if(ex)ex.Quantity+=q;else txnCart.push({New:true,Name:name,Unit:unit,Category:category,Quantity:q,Stock:0});}$('tQty').value=1;$('tNewName').value='';drawCart();return}const id=$('tItem').value,item=D.inventory.filter(x=>String(x.ItemID)===String(id))[0];if(!item)return alert('ไม่พบรายการพัสดุ');const ex=txnCart.filter(c=>!c.New&&String(c.ItemID)===String(id))[0];if(ex)ex.Quantity+=q;else txnCart.push({ItemID:item.ItemID,Name:item.Name,Unit:item.Unit,Quantity:q,Stock:item.Quantity});$('tQty').value=1;drawCart()}
+
+function drawTxn(){
+  const adj=txnType==='ADJUST',isIN=txnType==='IN';
+  $('modalTitle').textContent='รับเข้า / เบิกออกพัสดุ';
+  const cats=['กระดาษ','อุปกรณ์เขียนและลบ','แฟ้มและซอง','อุปกรณ์หนีบและเย็บ','กาวและเทป','อุปกรณ์ตัดและวัด','ตรายางและหมึก','ไอทีและอิเล็กทรอนิกส์','สมุดและเบ็ดเตล็ด','อุปกรณ์จัดเก็บเอกสาร','อื่นๆ'];
+  $('modalBody').innerHTML=`<div class="form"><label class="full">ประเภทรายการ<select id="tType" onchange="txnSetType(this.value)"><option value="IN"${isIN?' selected':''}>รับเข้าพัสดุ (เลือกได้หลายรายการ)</option><option value="OUT"${txnType==='OUT'?' selected':''}>เบิกออกพัสดุ (เลือกได้หลายรายการ)</option><option value="ADJUST"${adj?' selected':''}>ปรับยอดคงเหลือ (รายการเดียว)</option></select></label>${(!adj&&isIN)?`<label class="full" style="display:flex;align-items:center;gap:8px;background:rgba(0,212,255,0.1);padding:10px;border-radius:8px;font-weight:400;border:1px solid var(--border)"><input type="checkbox" id="tNew" onchange="txnToggleNew(this.checked)" style="width:auto"><span>พิมพ์ชื่อรายการใหม่ (ยังไม่มีในคลัง) — ระบบจะสร้างรหัสพัสดุให้อัตโนมัติ</span></label>`:''}<label class="full" id="tItemWrap" style="display:${(!adj&&isIN)?'none':''}">รายการพัสดุ<select id="tItem">${D.inventory.length?D.inventory.map(x=>`<option value="${x.ItemID}">${esc(x.Name)} (คงเหลือ ${x.Quantity} ${esc(x.Unit)})</option>`).join(''):'<option value="">-- ยังไม่มีรายการในคลัง --</option>'}</select></label>${(!adj&&isIN)?`<div id="tNewBox" class="form" style="display:none;grid-column:1/-1"><label class="full">ชื่อรายการใหม่<input id="tNewName" placeholder="พิมพ์ชื่อพัสดุที่ต้องการเพิ่ม เช่น ปากกาลูกลื่น สีน้ำเงิน"></label><label>หน่วยนับ<input id="tNewUnit" value="ชิ้น"></label><label>หมวดหมู่<select id="tNewCat">${cats.map(c=>`<option value="${c}"${c==='อื่นๆ'?' selected':''}>${c}</option>`).join('')}</select></label></div>`:''}<label>จำนวน<input id="tQty" type="number" min="1" value="1"></label>${adj?'':'<label style="align-self:end"><button type="button" class="secondary" style="width:100%" onclick="txnAdd()">＋ เพิ่มลงรายการ</button></label>'}</div>${adj?'':'<div id="tCart" style="margin-top:10px"></div>'}<div class="form" style="margin-top:10px"><label>ผู้รับผิดชอบ / ผู้เบิก<input id="tReq"></label><label>หน่วยงาน<select id="tDept"><option value="">-- เลือกหน่วยงาน --</option><option value="งานกลยุทธ์ฯ">งานกลยุทธ์ฯ</option><option value="งานบริการฯ">งานบริการฯ</option><option value="งานพัฒนาฯ">งานพัฒนาฯ</option><option value="งานสวัสดิการฯ">งานสวัสดิการฯ</option></select></label><label class="full">หมายเหตุ<input id="tNote"></label></div><div class="actions"><button class="secondary" onclick="closeM()">ยกเลิก</button><button id="tSave" onclick="txnSave()">${adj?'บันทึก':'บันทึกทั้งหมด'}</button></div>`;
+  if(!adj)drawCart()
+}
+
+function drawCart(){
+  const el=$('tCart');
+  if(!el)return;
+  if(!txnCart.length){el.innerHTML='<div style="padding:12px;border:1px dashed var(--border);border-radius:8px;color:var(--text-dim);text-align:center">ยังไม่มีรายการ — เลือกหรือพิมพ์ชื่อรายการด้านบนแล้วกด "＋ เพิ่มลงรายการ"</div>';return}
+  el.innerHTML='<table><tr><th>รายการ</th><th>จำนวน</th><th>คงเหลือ</th><th></th></tr>'+txnCart.map((c,i)=>`<tr><td>${esc(c.Name)}${c.New?' <span class="badge">ใหม่</span>':''}</td><td>${c.Quantity} ${esc(c.Unit)}</td><td>${c.New?'—':'<b>'+c.Stock+'</b> '+esc(c.Unit)}</td><td><button class="danger" type="button" style="padding:4px 8px" onclick="txnRemove(${i})">ลบ</button></td></tr>`).join('')+'</table><div class="actions" style="margin-top:8px"><button class="secondary" type="button" onclick="txnClear()">ล้างรายการ</button></div>';
+  const b=$('tSave');if(b)b.textContent=`บันทึกทั้งหมด (${txnCart.length} รายการ)`
+}
+
+function txnAdd(){
+  const q=Number($('tQty').value||0);
+  if(!q||q<=0)return alert('กรุณาระบุจำนวนมากกว่า 0');
+  const isNew=txnType==='IN'&&$('tNew')&&$('tNew').checked;
+  if(isNew){
+    const name=String($('tNewName').value||'').trim().replace(/\s+/g,' ');
+    if(!name)return alert('กรุณาพิมพ์ชื่อรายการใหม่');
+    const unit=String($('tNewUnit').value||'').trim()||'ชิ้น';
+    const category=$('tNewCat').value;
+    const exist=D.inventory.filter(x=>String(x.Name||'').trim().replace(/\s+/g,' ').toLowerCase()===name.toLowerCase())[0];
+    if(exist){const ex=txnCart.filter(c=>!c.New&&String(c.ItemID)===String(exist.ItemID))[0];if(ex)ex.Quantity+=q;else txnCart.push({ItemID:exist.ItemID,Name:exist.Name,Unit:exist.Unit,Quantity:q,Stock:exist.Quantity});alert('มีรายการชื่อนี้อยู่ในคลังแล้ว จึงเพิ่มจำนวนให้รายการเดิม: '+exist.Name);}
+    else{const ex=txnCart.filter(c=>c.New&&String(c.Name).toLowerCase()===name.toLowerCase())[0];if(ex)ex.Quantity+=q;else txnCart.push({New:true,Name:name,Unit:unit,Category:category,Quantity:q,Stock:0});}
+    $('tQty').value=1;$('tNewName').value='';drawCart();return
+  }
+  const id=$('tItem').value,item=D.inventory.filter(x=>String(x.ItemID)===String(id))[0];
+  if(!item)return alert('ไม่พบรายการพัสดุ');
+  const ex=txnCart.filter(c=>!c.New&&String(c.ItemID)===String(id))[0];
+  if(ex)ex.Quantity+=q;else txnCart.push({ItemID:item.ItemID,Name:item.Name,Unit:item.Unit,Quantity:q,Stock:item.Quantity});
+  $('tQty').value=1;drawCart()
+}
+
 function txnRemove(i){txnCart.splice(i,1);drawCart()}
-function txnSave(){if(txnType==='ADJUST'){call('recordTransaction',{ItemID:$('tItem').value,Type:'ADJUST',Quantity:$('tQty').value,Requester:$('tReq').value,Department:$('tDept').value,Note:$('tNote').value}).then(d=>{D=d;closeM();render()});return}if(!txnCart.length)return alert('กรุณาเพิ่มรายการพัสดุอย่างน้อย 1 รายการ');const info={req:$('tReq').value,dept:$('tDept').value,note:$('tNote').value},label=txnType==='IN'?'รับเข้า':'เบิกออก';$('tSave').disabled=true;$('tSave').textContent='⏳ กำลังบันทึก...';call('recordBatch',{Type:txnType,items:txnCart.map(c=>c.New?{New:true,Name:c.Name,Unit:c.Unit,Category:c.Category,Quantity:c.Quantity}:{ItemID:c.ItemID,Quantity:c.Quantity}),Requester:info.req,Department:info.dept,Note:info.note}).then(r=>{D=r.data;txnCart=[];$('modalTitle').textContent='✅ บันทึกการ'+label+'แล้ว';$('modalBody').innerHTML=`<div style="color:#64748b;margin-bottom:8px">${label} ${r.count} รายการ · ${new Date().toLocaleString('th-TH')}</div><table><tr><th>รายการ</th><th>${label}</th><th>คงเหลือใหม่</th></tr>${(r.items||[]).map(x=>`<tr><td>${esc(x.Code)} · ${esc(x.Name)}${x.Created?' <span class="badge">สร้างใหม่</span>':''}</td><td>${r.type==='IN'?'+':'−'}${x.Quantity} ${esc(x.Unit)}</td><td><b>${x.Remaining} ${esc(x.Unit)}</b></td></tr>`).join('')}</table><div class="actions"><button onclick="closeM();render()">ตกลง</button></div>`}).catch(()=>{$('tSave').disabled=false;$('tSave').textContent=`บันทึกทั้งหมด (${txnCart.length} รายการ)`})}function openAsset(x={}){const st=x.Status||'ใช้งาน';$('modalTitle').textContent=x.AssetID?'แก้ไขครุภัณฑ์':'เพิ่มครุภัณฑ์';$('modalBody').innerHTML=`<div class="form"><label>หมายเลขรหัสครุภัณฑ์ (กรอกเอง)<input id="aCode" placeholder="กรอกหมายเลขรหัสครุภัณฑ์" value="${esc(x.AssetCode||'')}"></label><label>ชื่อครุภัณฑ์<input id="aName" value="${esc(x.Name||'')}"></label><label>หมวดหมู่<input id="aCat" value="${esc(x.Category||'ครุภัณฑ์สำนักงาน')}"></label><label>หน่วยงาน<select id="aDept"><option value="">-- เลือกหน่วยงาน --</option><option value="งานกลยุทธ์ฯ" ${x.Department==='งานกลยุทธ์ฯ'?'selected':''}>งานกลยุทธ์ฯ</option><option value="งานบริการฯ" ${x.Department==='งานบริการฯ'?'selected':''}>งานบริการฯ</option><option value="งานพัฒนาฯ" ${x.Department==='งานพัฒนาฯ'?'selected':''}>งานพัฒนาฯ</option><option value="งานสวัสดิการฯ" ${x.Department==='งานสวัสดิการฯ'?'selected':''}>งานสวัสดิการฯ</option></select></label><label>สถานที่ตั้ง<input id="aLoc" value="${esc(x.Location||'')}"></label><label>ผู้รับผิดชอบ<input id="aResp" value="${esc(x.Responsible||'')}"></label><label>สถานะ<select id="aStatus">${['ใช้งาน','ถูกยืม','ชำรุด','จำหน่าย'].map(s=>`<option value="${s}"${st===s?' selected':''}>${s}</option>`).join('')}</select></label><label>ราคาซื้อ<input id="aCost" type="number" value="${x.Cost||0}"></label><label class="full">หมายเหตุ<textarea id="aNote">${esc(x.Note||'')}</textarea></label></div><div class="actions"><button class="secondary" onclick="closeM()">ยกเลิก</button><button onclick="saveAsset()">บันทึก</button></div>`;$('modal').classList.add('on');window.editAsset=x}function saveAsset(){const code=$('aCode').value.trim(),name=$('aName').value.trim();if(!code)return alert('กรุณากรอกหมายเลขรหัสครุภัณฑ์');if(!name)return alert('กรุณากรอกชื่อครุภัณฑ์');call('saveAsset',{AssetID:window.editAsset.AssetID,AssetCode:code,Name:name,Category:$('aCat').value,Department:$('aDept').value,Location:$('aLoc').value,Responsible:$('aResp').value,Status:$('aStatus').value,Cost:$('aCost').value,Note:$('aNote').value}).then(d=>{D=d;closeM();render()})}function todayStr(){const d=new Date(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${d.getFullYear()}-${m}-${day}`}function openLoan(assetId=''){const avail=(D.assets||[]).filter(a=>a.Status!=='ถูกยืม'&&a.Status!=='ชำรุด'&&a.Status!=='จำหน่าย');if(!avail.length)return alert('ไม่มีครุภัณฑ์ที่พร้อมให้ยืม (กรุณาเพิ่มครุภัณฑ์ หรือรับคืนรายการที่ถูกยืมก่อน)');const t=todayStr();$('modalTitle').textContent='📋 บันทึกการยืมครุภัณฑ์';$('modalBody').innerHTML=`<div class="form"><label class="full">เลือกครุภัณฑ์ที่ต้องการยืม<select id="lAsset">${avail.map(a=>`<option value="${a.AssetID}"${String(a.AssetID)===String(assetId)?' selected':''}>${esc(a.AssetCode)} · ${esc(a.Name)}</option>`).join('')}</select></label><label>ชื่อผู้ยืม<input id="lBorrower" placeholder="ชื่อ-สกุล ผู้ยืม"></label><label>หน่วยงานผู้ยืม<select id="lDept"><option value="">-- เลือกหน่วยงาน --</option><option value="งานกลยุทธ์ฯ">งานกลยุทธ์ฯ</option><option value="งานบริการฯ">งานบริการฯ</option><option value="งานพัฒนาฯ">งานพัฒนาฯ</option><option value="งานสวัสดิการฯ">งานสวัสดิการฯ</option></select></label><label>วันที่ยืม<input id="lBorrowDate" type="date" value="${t}"></label><label>กำหนดคืนวันที่<input id="lDueDate" type="date" value="${t}"></label><label class="full">นำไปใช้ในงานอะไร<input id="lPurpose" placeholder="ระบุภารกิจ/โครงการ/งานที่นำไปใช้"></label><label class="full">สภาพการใช้งานก่อนยืม<select id="lCondBefore"><option value="ปกติ/พร้อมใช้งาน">ปกติ/พร้อมใช้งาน</option><option value="สมบูรณ์ดีมาก">สมบูรณ์ดีมาก</option><option value="มีรอยขีดข่วนเล็กน้อย (ใช้งานได้ปกติ)">มีรอยขีดข่วนเล็กน้อย (ใช้งานได้ปกติ)</option><option value="อื่นๆ (ระบุในหมายเหตุ)">อื่นๆ (ระบุในหมายเหตุ)</option></select></label><label class="full">หมายเหตุ / อุปกรณ์ประกอบที่ยืมไปด้วย<textarea id="lNote" placeholder="เช่น สายชาร์จ กระเป๋า เมาส์ ฯลฯ"></textarea></label></div><div class="actions"><button class="secondary" onclick="closeM()">ยกเลิก</button><button id="lSaveBtn" onclick="saveLoan()">บันทึกการยืม</button></div>`;$('modal').classList.add('on')}function saveLoan(){const borrower=$('lBorrower').value.trim(),purpose=$('lPurpose').value.trim(),bDate=$('lBorrowDate').value,dDate=$('lDueDate').value;if(!borrower)return alert('กรุณาระบุชื่อผู้ยืม');if(!bDate)return alert('กรุณาระบุวันที่ยืม');if(!dDate)return alert('กรุณาระบุวันที่กำหนดคืน');if(!purpose)return alert('กรุณาระบุว่านำไปใช้ในงานอะไร');$('lSaveBtn').disabled=true;$('lSaveBtn').textContent='⏳ กำลังบันทึก...';call('borrowAsset',{AssetID:$('lAsset').value,Borrower:borrower,Department:$('lDept').value,BorrowDate:bDate,DueDate:dDate,Purpose:purpose,ConditionBefore:$('lCondBefore').value,Note:$('lNote').value}).then(d=>{D=d;closeM();render()}).catch(()=>{$('lSaveBtn').disabled=false;$('lSaveBtn').textContent='บันทึกการยืม'})}function openReturn(loanId){const loan=(D.assetLoans||[]).find(x=>String(x.LoanID)===String(loanId));if(!loan)return alert('ไม่พบข้อมูลการยืม');const t=todayStr();$('modalTitle').textContent='🔄 บันทึกการคืนครุภัณฑ์';$('modalBody').innerHTML=`<div style="background:#f4f7fb;padding:12px;border-radius:8px;margin-bottom:12px;font-size:13px"><b>${esc(loan.AssetCode)} · ${esc(loan.AssetName)}</b><br>ผู้ยืม: <b>${esc(loan.Borrower)}</b> (${esc(loan.Department||'-')})<br>งานที่นำไปใช้: ${esc(loan.Purpose)}<br>วันที่ยืม: ${fmtDate(loan.BorrowDate)} · กำหนดคืน: ${fmtDate(loan.DueDate)}<br>สภาพก่อนยืม: <b>${esc(loan.ConditionBefore||'-')}</b></div><div class="form"><label>วันที่คืนจริง<input id="rDate" type="date" value="${t}"></label><label>คืนสิ่งที่ยืมครบหรือไม่<select id="rComplete"><option value="ครบถ้วน">ครบถ้วน</option><option value="ไม่ครบ (ระบุในหมายเหตุ)">ไม่ครบ (ระบุในหมายเหตุ)</option></select></label><label class="full">สภาพการใช้งานหลังคืน<select id="rCondAfter"><option value="ปกติ/พร้อมใช้งาน">ปกติ/พร้อมใช้งาน</option><option value="สมบูรณ์ดีมาก">สมบูรณ์ดีมาก</option><option value="มีรอยขีดข่วน/สึกหรอเล็กน้อย (ใช้งานได้)">มีรอยขีดข่วน/สึกหรอเล็กน้อย (ใช้งานได้)</option><option value="ชำรุด/ต้องซ่อมแซม">ชำรุด/ต้องซ่อมแซม</option></select></label><label class="full">หมายเหตุการคืน<textarea id="rNote" placeholder="ระบุรายการที่ขาด หรืออาการชำรุด (ถ้ามี)">${esc(loan.Note||'')}</textarea></label></div><div class="actions"><button class="secondary" onclick="closeM()">ยกเลิก</button><button id="rSaveBtn" onclick="saveReturn('${loan.LoanID}')">ยืนยันการรับคืน</button></div>`;$('modal').classList.add('on')}function saveReturn(loanId){const rDate=$('rDate').value;if(!rDate)return alert('กรุณาระบุวันที่คืน');$('rSaveBtn').disabled=true;$('rSaveBtn').textContent='⏳ กำลังบันทึก...';call('returnAsset',{LoanID:loanId,ReturnDate:rDate,ReturnedComplete:$('rComplete').value,ConditionAfter:$('rCondAfter').value,Note:$('rNote').value}).then(d=>{D=d;closeM();render()}).catch(()=>{$('rSaveBtn').disabled=false;$('rSaveBtn').textContent='ยืนยันการรับคืน'})}function closeM(){$('modal').classList.remove('on')}function setupNow(){call('setup').then(()=>{alert('สร้างแท็บระบบเรียบร้อยแล้ว');load()})}load();</script></body></html>
+
+function txnSave(){
+  if(txnType==='ADJUST'){call('recordTransaction',{ItemID:$('tItem').value,Type:'ADJUST',Quantity:$('tQty').value,Requester:$('tReq').value,Department:$('tDept').value,Note:$('tNote').value}).then(d=>{D=d;closeM();render()});return}
+  if(!txnCart.length)return alert('กรุณาเพิ่มรายการพัสดุอย่างน้อย 1 รายการ');
+  const info={req:$('tReq').value,dept:$('tDept').value,note:$('tNote').value},label=txnType==='IN'?'รับเข้า':'เบิกออก';
+  $('tSave').disabled=true;$('tSave').textContent='⏳ กำลังบันทึก...';
+  call('recordBatch',{Type:txnType,items:txnCart.map(c=>c.New?{New:true,Name:c.Name,Unit:c.Unit,Category:c.Category,Quantity:c.Quantity}:{ItemID:c.ItemID,Quantity:c.Quantity}),Requester:info.req,Department:info.dept,Note:info.note}).then(r=>{D=r.data;txnCart=[];$('modalTitle').textContent='✅ บันทึกการ'+label+'แล้ว';$('modalBody').innerHTML=`<div style="color:var(--text-dim);margin-bottom:8px">${label} ${r.count} รายการ · ${new Date().toLocaleString('th-TH')}</div><table><tr><th>รายการ</th><th>${label}</th><th>คงเหลือใหม่</th></tr>${(r.items||[]).map(x=>`<tr><td>${esc(x.Code)} · ${esc(x.Name)}${x.Created?' <span class="badge">สร้างใหม่</span>':''}</td><td>${r.type==='IN'?'+':'−'}${x.Quantity} ${esc(x.Unit)}</td><td><b>${x.Remaining} ${esc(x.Unit)}</b></td></tr>`).join('')}</table><div class="actions"><button onclick="closeM();render()">ตกลง</button></div>`}).catch(()=>{$('tSave').disabled=false;$('tSave').textContent=`บันทึกทั้งหมด (${txnCart.length} รายการ)`})
+}
+
+function openAsset(x={}){
+  const st=x.Status||'ใช้งาน';
+  $('modalTitle').textContent=x.AssetID?'แก้ไขครุภัณฑ์':'เพิ่มครุภัณฑ์';
+  $('modalBody').innerHTML=`<div class="form"><label>หมายเลขรหัสครุภัณฑ์ (กรอกเอง)<input id="aCode" placeholder="กรอกหมายเลขรหัสครุภัณฑ์" value="${esc(x.AssetCode||'')}"></label><label>ชื่อครุภัณฑ์<input id="aName" value="${esc(x.Name||'')}"></label><label>หมวดหมู่<input id="aCat" value="${esc(x.Category||'ครุภัณฑ์สำนักงาน')}"></label><label>หน่วยงาน<select id="aDept"><option value="">-- เลือกหน่วยงาน --</option><option value="งานกลยุทธ์ฯ" ${x.Department==='งานกลยุทธ์ฯ'?'selected':''}>งานกลยุทธ์ฯ</option><option value="งานบริการฯ" ${x.Department==='งานบริการฯ'?'selected':''}>งานบริการฯ</option><option value="งานพัฒนาฯ" ${x.Department==='งานพัฒนาฯ'?'selected':''}>งานพัฒนาฯ</option><option value="งานสวัสดิการฯ" ${x.Department==='งานสวัสดิการฯ'?'selected':''}>งานสวัสดิการฯ</option></select></label><label>สถานที่ตั้ง<input id="aLoc" value="${esc(x.Location||'')}"></label><label>ผู้รับผิดชอบ<input id="aResp" value="${esc(x.Responsible||'')}"></label><label>สถานะ<select id="aStatus">${['ใช้งาน','ถูกยืม','ชำรุด','จำหน่าย'].map(s=>`<option value="${s}"${st===s?' selected':''}>${s}</option>`).join('')}</select></label><label>ราคาซื้อ<input id="aCost" type="number" value="${x.Cost||0}"></label><label class="full">หมายเหตุ<textarea id="aNote">${esc(x.Note||'')}</textarea></label></div><div class="actions"><button class="secondary" onclick="closeM()">ยกเลิก</button><button onclick="saveAsset()">บันทึก</button></div>`;
+  $('modal').classList.add('on');window.editAsset=x
+}
+
+function saveAsset(){
+  const code=$('aCode').value.trim(),name=$('aName').value.trim();
+  if(!code)return alert('กรุณากรอกหมายเลขรหัสครุภัณฑ์');
+  if(!name)return alert('กรุณากรอกชื่อครุภัณฑ์');
+  call('saveAsset',{AssetID:window.editAsset.AssetID,AssetCode:code,Name:name,Category:$('aCat').value,Department:$('aDept').value,Location:$('aLoc').value,Responsible:$('aResp').value,Status:$('aStatus').value,Cost:$('aCost').value,Note:$('aNote').value}).then(d=>{D=d;closeM();render()})
+}
+
+function todayStr(){const d=new Date(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${d.getFullYear()}-${m}-${day}`}
+
+function openLoan(assetId=''){
+  const avail=(D.assets||[]).filter(a=>a.Status!=='ถูกยืม'&&a.Status!=='ชำรุด'&&a.Status!=='จำหน่าย');
+  if(!avail.length)return alert('ไม่มีครุภัณฑ์ที่พร้อมให้ยืม (กรุณาเพิ่มครุภัณฑ์ หรือรับคืนรายการที่ถูกยืมก่อน)');
+  const t=todayStr();
+  $('modalTitle').textContent='📋 บันทึกการยืมครุภัณฑ์';
+  $('modalBody').innerHTML=`<div class="form"><label class="full">เลือกครุภัณฑ์ที่ต้องการยืม<select id="lAsset">${avail.map(a=>`<option value="${a.AssetID}"${String(a.AssetID)===String(assetId)?' selected':''}>${esc(a.AssetCode)} · ${esc(a.Name)}</option>`).join('')}</select></label><label>ชื่อผู้ยืม<input id="lBorrower" placeholder="ชื่อ-สกุล ผู้ยืม"></label><label>หน่วยงานผู้ยืม<select id="lDept"><option value="">-- เลือกหน่วยงาน --</option><option value="งานกลยุทธ์ฯ">งานกลยุทธ์ฯ</option><option value="งานบริการฯ">งานบริการฯ</option><option value="งานพัฒนาฯ">งานพัฒนาฯ</option><option value="งานสวัสดิการฯ">งานสวัสดิการฯ</option></select></label><label>วันที่ยืม<input id="lBorrowDate" type="date" value="${t}"></label><label>กำหนดคืนวันที่<input id="lDueDate" type="date" value="${t}"></label><label class="full">นำไปใช้ในงานอะไร<input id="lPurpose" placeholder="ระบุภารกิจ/โครงการ/งานที่นำไปใช้"></label><label class="full">สภาพการใช้งานก่อนยืม<select id="lCondBefore"><option value="ปกติ/พร้อมใช้งาน">ปกติ/พร้อมใช้งาน</option><option value="สมบูรณ์ดีมาก">สมบูรณ์ดีมาก</option><option value="มีรอยขีดข่วนเล็กน้อย (ใช้งานได้ปกติ)">มีรอยขีดข่วนเล็กน้อย (ใช้งานได้ปกติ)</option><option value="อื่นๆ (ระบุในหมายเหตุ)">อื่นๆ (ระบุในหมายเหตุ)</option></select></label><label class="full">หมายเหตุ / อุปกรณ์ประกอบที่ยืมไปด้วย<textarea id="lNote" placeholder="เช่น สายชาร์จ กระเป๋า เมาส์ ฯลฯ"></textarea></label></div><div class="actions"><button class="secondary" onclick="closeM()">ยกเลิก</button><button id="lSaveBtn" onclick="saveLoan()">บันทึกการยืม</button></div>`;
+  $('modal').classList.add('on')
+}
+
+function saveLoan(){
+  const borrower=$('lBorrower').value.trim(),purpose=$('lPurpose').value.trim(),bDate=$('lBorrowDate').value,dDate=$('lDueDate').value;
+  if(!borrower)return alert('กรุณาระบุชื่อผู้ยืม');
+  if(!bDate)return alert('กรุณาระบุวันที่ยืม');
+  if(!dDate)return alert('กรุณาระบุวันที่กำหนดคืน');
+  if(!purpose)return alert('กรุณาระบุว่านำไปใช้ในงานอะไร');
+  $('lSaveBtn').disabled=true;$('lSaveBtn').textContent='⏳ กำลังบันทึก...';
+  call('borrowAsset',{AssetID:$('lAsset').value,Borrower:borrower,Department:$('lDept').value,BorrowDate:bDate,DueDate:dDate,Purpose:purpose,ConditionBefore:$('lCondBefore').value,Note:$('lNote').value}).then(d=>{D=d;closeM();render()}).catch(()=>{$('lSaveBtn').disabled=false;$('lSaveBtn').textContent='บันทึกการยืม'})
+}
+
+function openReturn(loanId){
+  const loan=(D.assetLoans||[]).find(x=>String(x.LoanID)===String(loanId));
+  if(!loan)return alert('ไม่พบข้อมูลการยืม');
+  const t=todayStr();
+  $('modalTitle').textContent='🔄 บันทึกการคืนครุภัณฑ์';
+  $('modalBody').innerHTML=`<div style="background:rgba(0,212,255,0.1);padding:12px;border-radius:8px;margin-bottom:12px;font-size:13px;border:1px solid var(--border)"><b>${esc(loan.AssetCode)} · ${esc(loan.AssetName)}</b><br>ผู้ยืม: <b>${esc(loan.Borrower)}</b> (${esc(loan.Department||'-')})<br>งานที่นำไปใช้: ${esc(loan.Purpose)}<br>วันที่ยืม: ${fmtDate(loan.BorrowDate)} · กำหนดคืน: ${fmtDate(loan.DueDate)}<br>สภาพก่อนยืม: <b>${esc(loan.ConditionBefore||'-')}</b></div><div class="form"><label>วันที่คืนจริง<input id="rDate" type="date" value="${t}"></label><label>คืนสิ่งที่ยืมครบหรือไม่<select id="rComplete"><option value="ครบถ้วน">ครบถ้วน</option><option value="ไม่ครบ (ระบุในหมายเหตุ)">ไม่ครบ (ระบุในหมายเหตุ)</option></select></label><label class="full">สภาพการใช้งานหลังคืน<select id="rCondAfter"><option value="ปกติ/พร้อมใช้งาน">ปกติ/พร้อมใช้งาน</option><option value="สมบูรณ์ดีมาก">สมบูรณ์ดีมาก</option><option value="มีรอยขีดข่วน/สึกหรอเล็กน้อย (ใช้งานได้)">มีรอยขีดข่วน/สึกหรอเล็กน้อย (ใช้งานได้)</option><option value="ชำรุด/ต้องซ่อมแซม">ชำรุด/ต้องซ่อมแซม</option></select></label><label class="full">หมายเหตุการคืน<textarea id="rNote" placeholder="ระบุรายการที่ขาด หรืออาการชำรุด (ถ้ามี)">${esc(loan.Note||'')}</textarea></label></div><div class="actions"><button class="secondary" onclick="closeM()">ยกเลิก</button><button id="rSaveBtn" onclick="saveReturn('${loan.LoanID}')">ยืนยันการรับคืน</button></div>`;
+  $('modal').classList.add('on')
+}
+
+function saveReturn(loanId){
+  const rDate=$('rDate').value;
+  if(!rDate)return alert('กรุณาระบุวันที่คืน');
+  $('rSaveBtn').disabled=true;$('rSaveBtn').textContent='⏳ กำลังบันทึก...';
+  call('returnAsset',{LoanID:loanId,ReturnDate:rDate,ReturnedComplete:$('rComplete').value,ConditionAfter:$('rCondAfter').value,Note:$('rNote').value}).then(d=>{D=d;closeM();render()}).catch(()=>{$('rSaveBtn').disabled=false;$('rSaveBtn').textContent='ยืนยันการรับคืน'})
+}
+
+load();
+</script>
+</body>
+</html>
