@@ -77,6 +77,56 @@ function run_(action, data) {
   }
 }
 function ss_() { return SpreadsheetApp.openById(SPREADSHEET_ID); }
+
+/* ===== Google Chat notification =====
+ * เก็บ webhook ไว้ใน chat-config.local.gs (file นี้ถูก .gitignore ไม่ถูก commit)
+ * ถ้าไม่มีไฟล์นั้น ระบบจะไม่ส่งแจ้งเตือน แต่การเบิก/ตัดสต็อกยังทำงานปกติ
+ */
+function chatWebhookUrl_() {
+  try {
+    if (typeof CHAT_WEBHOOK_URL === 'string' && CHAT_WEBHOOK_URL.trim()) return CHAT_WEBHOOK_URL.trim();
+  } catch (e) { /* ไม่มีไฟล์ config */ }
+  return '';
+}
+function chatTime_(d) {
+  try { return Utilities.formatDate(d || new Date(), 'Asia/Bangkok', 'dd MMM yyyy HH:mm'); }
+  catch (e) { return String(d || ''); }
+}
+function notifyChatWithdrawal_(p) {
+  const url = chatWebhookUrl_();
+  if (!url) { Logger.log('Chat: ไม่พบ CHAT_WEBHOOK_URL — ข้ามการแจ้งเตือน'); return false; }
+  p = p || {};
+  const items = Array.isArray(p.items) ? p.items : [];
+  const lines = [];
+  lines.push('🚨 มีรายการเบิกพัสดุใหม่');
+  lines.push('🔖 เลขที่: #' + String(p.batchId || '-').slice(-8));
+  lines.push('🕒 เวลา: ' + chatTime_(p.now) + ' น.');
+  lines.push('👤 ผู้เบิก: ' + (String(p.req || '').trim() || '-'));
+  lines.push('🏢 หน่วยงาน: ' + (String(p.dept || '').trim() || '-'));
+  lines.push('📦 รายการ (' + (p.count || items.length) + ' รายการ):');
+  items.slice(0, 20).forEach(function (x) {
+    lines.push('• ' + String(x.Code || '') + ' ' + String(x.Name || '') + ' — ' + num_(x.Quantity) + ' ' + String(x.Unit || '') +
+      ' (เหลือ ' + num_(x.Remaining) + ')');
+  });
+  if (items.length > 20) lines.push('… และอีก ' + (items.length - 20) + ' รายการ');
+  if (String(p.note || '').trim()) lines.push('📝 หมายเหตุ: ' + String(p.note).trim());
+  if (String(p.source || '').trim()) lines.push('🔗 ช่องทาง: ' + String(p.source).trim());
+  lines.push('เปิดแดชบอร์ด: https://dinoeater-th.github.io/HR-Inventory-/index.html');
+  try {
+    const res = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json; charset=UTF-8',
+      payload: JSON.stringify({ text: lines.join('\n') }),
+      muteHttpExceptions: true
+    });
+    const code = res ? res.getResponseCode() : 0;
+    if (code >= 200 && code < 300) return true;
+    Logger.log('Chat: ส่งไม่สำเร็จ HTTP ' + code + ' ' + (res ? String(res.getContentText()).slice(0, 300) : ''));
+  } catch (err) {
+    Logger.log('Chat: ส่งไม่สำเร็จ ' + String((err && err.message) || err));
+  }
+  return false;
+}
 // รับได้ทั้ง {id:'IT...'} และ 'IT...' (รองรับหน้าเว็บรุ่นเก่าที่ cache อยู่)
 function idOf_(data) {
   if (data === null || data === undefined) return '';
@@ -265,7 +315,13 @@ function recordTransaction(t) {
   const q=num_(t.Quantity); if(q<=0)throw Error('จำนวนต้องมากกว่า 0'); const type=String(t.Type||'IN').toUpperCase(); let next=num_(item.Quantity);
   if(type==='OUT'){if(q>next)throw Error('จำนวนคงเหลือไม่พอ');next-=q;}else if(type==='IN')next+=q;else if(type==='ADJUST')next=q;else throw Error('ประเภทรายการไม่ถูกต้อง');
   update_('Inventory','ItemID',item.ItemID,{Quantity:next,UpdatedAt:new Date()});
-  append_('Transactions',{TxnID:id_('TX'),BatchID:id_('BX'),Date:t.Date?new Date(t.Date):new Date(),Type:type,ItemID:item.ItemID,Code:padCode_(item.Code),Name:item.Name,Quantity:q,Unit:item.Unit,Requester:t.Requester||'',Department:t.Department||'',Note:t.Note||'',CreatedAt:new Date()});
+  const batchId = id_('BX');
+  append_('Transactions',{TxnID:id_('TX'),BatchID:batchId,Date:t.Date?new Date(t.Date):new Date(),Type:type,ItemID:item.ItemID,Code:padCode_(item.Code),Name:item.Name,Quantity:q,Unit:item.Unit,Requester:t.Requester||'',Department:t.Department||'',Note:t.Note||'',CreatedAt:new Date()});
+  if (type === 'OUT') {
+    notifyChatWithdrawal_({ batchId: batchId, now: new Date(), req: t.Requester, dept: t.Department, note: t.Note,
+      source: 'แดชบอร์ด · ปรับยอดรายการเดียว', count: 1,
+      items: [{ Code: padCode_(item.Code), Name: item.Name, Quantity: q, Unit: item.Unit, Remaining: next }] });
+  }
   return t.light ? { saved: true, name: item.Name, remaining: next, unit: item.Unit, data: getItemList() } : getDashboard();
 }
 // บันทึกรับเข้า/เบิกออกหลายรายการพร้อมกัน (แดชบอร์ด) — ตรวจครบทุกรายการก่อนเขียนข้อมูล
@@ -339,6 +395,10 @@ function recordBatch(p) {
     });
   }
 
+  if (type === 'OUT') {
+    notifyChatWithdrawal_({ batchId: batchId, now: now, req: req, dept: dept, note: note,
+      source: 'แดชบอร์ด · เบิกออกหลายรายการ', count: result.length, items: result });
+  }
   return { saved: true, count: result.length, type: type, items: result, batchId: batchId, data: getDashboard() };
 }
 // บันทึกการเบิกหลายรายการพร้อมกัน (หน้าเบิกของ) — ตรวจสต็อกครบทุกรายการก่อนเขียนข้อมูล
@@ -368,7 +428,10 @@ function recordWithdrawalBatch(p) {
     update_('Inventory', 'ItemID', row.item.ItemID, { Quantity: row.next, UpdatedAt: now });
     append_('Transactions', { TxnID: id_('TX'), Date: now, Type: 'OUT', ItemID: row.item.ItemID, Code: padCode_(row.item.Code), Name: row.item.Name, Quantity: row.q, Unit: row.item.Unit, Requester: req, Department: dept, Note: note, CreatedAt: now, BatchID: batchId });
   });
-  return { saved: true, count: plan.length, batchId: batchId, receipt: plan.map(function (r) { return { Code: padCode_(r.item.Code), Name: r.item.Name, Quantity: r.q, Unit: r.item.Unit, Remaining: r.next }; }), data: getItemList() };
+  const receipt = plan.map(function (r) { return { Code: padCode_(r.item.Code), Name: r.item.Name, Quantity: r.q, Unit: r.item.Unit, Remaining: r.next }; });
+  notifyChatWithdrawal_({ batchId: batchId, now: now, req: req, dept: dept, note: note,
+    source: 'หน้าเบิกพัสดุ (withdraw.html)', count: receipt.length, items: receipt });
+  return { saved: true, count: plan.length, batchId: batchId, receipt: receipt, data: getItemList() };
 }
 // ปรับสถานะการรับพัสดุของรายการเบิกทั้งชุด (ทุกแถวที่มี BatchID / คีย์เดียวกัน)
 function setWithdrawalStatus(p) {

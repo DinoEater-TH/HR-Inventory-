@@ -33,6 +33,7 @@ appsscript.json  สิทธิ์สคริปต์ (สเปรดชี�
 index.html       หน้าแดชบอร์ดผู้ดูแล (static)
 withdraw.html    หน้าเบิกของ (static)
 config.js        เก็บ URL ของ API — แก้ที่เดียวเมื่อ deploy ใหม่
+chat-config.local.gs  เก็บ Webhook URL ของ Google Chat (ไฟล์ลับ อยู่ใน .gitignore — ห้าม commit)
 README.md        ไฟล์นี้
 ```
 
@@ -59,6 +60,18 @@ git add -A ; git commit -m "..." ; git push
 หน้าเว็บอัปเดตทันทีที่ `git push` (GitHub Pages build เอง)
 > หมายเหตุ: เมื่อแก้ `config.js` ให้เพิ่ม `?v=` เลขใหม่ที่แท็ก `<script src="config.js?v=...">`
 > ใน `index.html` และ `withdraw.html` ด้วย เพื่อไม่ให้เบราว์เซอร์ใช้ไฟล์เก่าจากแคช
+
+## แจ้งเตือน Google Chat ตอนเบิกของ
+เมื่อมีการเบิกออก (หน้า `withdraw.html`, แดชบอร์ดแบบหลายรายการ, และปรับยอดรายการเดียว)
+ระบบจะส่งข้อความหา Google Chat space ของผู้ดูแล **หลังตัดสต็อกสำเร็จ** โดยอัตโนมัติ
+
+- Webhook URL เก็บใน `chat-config.local.gs` (ไฟล์นี้ถูก `.gitignore` → ไม่ขึ้น GitHub)
+- `clasp push --force` จะส่งไฟล์นี้ขึ้น Apps Script ด้วย (ไม่ต้องแก้ `appsscript.json`)
+- ถ้าไม่พบไฟล์ หรือ Chat ส่งไม่ได้ ระบบจะ **ไม่ทำให้การเบิกพลาด** — มีแค่ log ใน Apps Script
+- ต้องการปิดการแจ้งเตือน: ลบ/เปลี่ยนค่าตัวแปร `CHAT_WEBHOOK_URL` ในไฟล์นั้น แล้ว push ใหม่
+
+ข้อความที่ส่งประกอบด้วย: เลขที่ชุดรายการ, เวลา, ผู้เบิก, หน่วยงาน, รายการที่เบิก + คงเหลือใหม่, หมายเหตุ,
+ช่องทางที่เบิก และลิงก์แดชบอร์ด (ตัดแสดงผลไม่เกิน 20 รายการแรกต่อข้อความ)
 
 ## ข้อมูล
 ผูกกับ Google Spreadsheet ID `11voKZ1nFezcgt5Jz2SaBNs4-th7V7xrNKZ2fkz1Fsqo`
