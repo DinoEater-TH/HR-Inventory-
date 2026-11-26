@@ -939,7 +939,7 @@ function txnSave(){if(svBusy)return;if(txnType==='ADJUST'){svStart(8,'กำล�
   draw();
   loadHistory();
   console.log('BLOCK3-BEFORE-LOAD');
-  fetch(window.API_URL+'?action=getDashboard&data=null').then(function(r){console.log('DIRECT-FETCH-RESOLVED',r.status);return r.json();}).then(function(j){console.log('DIRECT-JSON',j.result.inventory.length);}).catch(function(e){console.log('DIRECT-ERR',String(e));});
+  window.onload = function () { console.log('WINDOW-ONLOAD-FIRED'); setTimeout(function(){ console.log('ONLOAD-TIMEOUT-FIRED'); load(); }, 1000); };
   console.log('BLOCK3-AFTER-LOAD-CALL');
   setInterval(function () { if (document.visibilityState === 'visible') loadHistory(); }, 60000);
 })();
