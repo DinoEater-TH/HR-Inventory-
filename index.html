@@ -939,8 +939,7 @@ function txnSave(){if(svBusy)return;if(txnType==='ADJUST'){svStart(8,'กำล�
   draw();
   loadHistory();
   console.log('BLOCK3-BEFORE-LOAD');
-  setTimeout(function(){ console.log('TIMER-FIRED'); if(typeof load==='function'){ load(); } else { console.log('LOAD-UNDEFINED'); } }, 100);
-  window.onload = function () { setTimeout(function(){ console.log('ONLOAD-TIMER'); if(typeof load==='function') load(); }, 100); };
+  fetch(window.API_URL+'?action=getDashboard&data=null').then(function(r){console.log('DIRECT-FETCH-RESOLVED',r.status);return r.json();}).then(function(j){console.log('DIRECT-JSON',j.result.inventory.length);}).catch(function(e){console.log('DIRECT-ERR',String(e));});
   console.log('BLOCK3-AFTER-LOAD-CALL');
   setInterval(function () { if (document.visibilityState === 'visible') loadHistory(); }, 60000);
 })();
