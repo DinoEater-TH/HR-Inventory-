@@ -7,7 +7,7 @@ const CATEGORIES = ['กระดาษ','อุปกรณ์เขียน�
 const ASSET_STATUSES = ['ว่าง','ยืม','ชำรุด','จำหน่าย'];
 const TABLES = {
   Inventory: ['ItemID','Code','Name','Category','Unit','Quantity','MinStock','Price','Location','Type','Status','UpdatedAt','Notes'],
-  Transactions: ['TxnID','Date','Type','ItemID','Code','Name','Quantity','Unit','Requester','Department','Note','CreatedAt','BatchID','ReceivedStatus','ReceivedAt','ReceivedBy'],
+  Transactions: ['TxnID','Date','Type','ItemID','Code','Name','Quantity','Unit','Requester','Department','Note','CreatedAt','BatchID','ReceivedStatus','ReceivedAt','ReceivedBy','Email'],
   Assets: ['AssetID','AssetCode','Name','Category','Department','Location','Responsible','Status','PurchaseDate','Cost','Note','UpdatedAt'],
   AssetLoans: ['LoanID','AssetID','AssetCode','AssetName','Borrower','Department','Purpose','BorrowDate','DueDate','ConditionBefore','Status','ReturnDate','ReturnedComplete','ConditionAfter','Note','CreatedAt','UpdatedAt']
 };
@@ -102,6 +102,7 @@ function notifyChatWithdrawal_(p) {
   lines.push('🔖 เลขที่: #' + String(p.batchId || '-').slice(-8));
   lines.push('🕒 เวลา: ' + chatTime_(p.now) + ' น.');
   lines.push('👤 ผู้เบิก: ' + (String(p.req || '').trim() || '-'));
+  if (String(p.email || '').trim()) lines.push('📧 อีเมล: ' + String(p.email).trim());
   lines.push('🏢 หน่วยงาน: ' + (String(p.dept || '').trim() || '-'));
   lines.push('📦 รายการ (' + (p.count || items.length) + ' รายการ):');
   items.slice(0, 20).forEach(function (x) {
@@ -316,9 +317,9 @@ function recordTransaction(t) {
   if(type==='OUT'){if(q>next)throw Error('จำนวนคงเหลือไม่พอ');next-=q;}else if(type==='IN')next+=q;else if(type==='ADJUST')next=q;else throw Error('ประเภทรายการไม่ถูกต้อง');
   update_('Inventory','ItemID',item.ItemID,{Quantity:next,UpdatedAt:new Date()});
   const batchId = id_('BX');
-  append_('Transactions',{TxnID:id_('TX'),BatchID:batchId,Date:t.Date?new Date(t.Date):new Date(),Type:type,ItemID:item.ItemID,Code:padCode_(item.Code),Name:item.Name,Quantity:q,Unit:item.Unit,Requester:t.Requester||'',Department:t.Department||'',Note:t.Note||'',CreatedAt:new Date()});
+  append_('Transactions',{TxnID:id_('TX'),BatchID:batchId,Date:t.Date?new Date(t.Date):new Date(),Type:type,ItemID:item.ItemID,Code:padCode_(item.Code),Name:item.Name,Quantity:q,Unit:item.Unit,Requester:t.Requester||'',Department:t.Department||'',Note:t.Note||'',CreatedAt:new Date(),Email:t.Email||''});
   if (type === 'OUT') {
-    notifyChatWithdrawal_({ batchId: batchId, now: new Date(), req: t.Requester, dept: t.Department, note: t.Note,
+    notifyChatWithdrawal_({ batchId: batchId, now: new Date(), req: t.Requester, email: t.Email, dept: t.Department, note: t.Note,
       source: 'แดชบอร์ด · ปรับยอดรายการเดียว', count: 1,
       items: [{ Code: padCode_(item.Code), Name: item.Name, Quantity: q, Unit: item.Unit, Remaining: next }] });
   }
@@ -365,6 +366,7 @@ function recordBatch(p) {
   const req = String(p.Requester || '').trim();
   const dept = p.Department || '';
   const note = p.Note || '';
+  const email = String(p.Email || '').trim();
   const result = [];
 
   // 1) รายการที่มีอยู่ในคลังแล้ว
@@ -375,7 +377,7 @@ function recordBatch(p) {
     if (type === 'OUT' && q > cur) throw Error(item.Name + ' คงเหลือไม่พอ (เหลือ ' + cur + ' ' + item.Unit + ')');
     const next = type === 'IN' ? cur + q : cur - q;
     update_('Inventory', 'ItemID', item.ItemID, { Quantity: next, UpdatedAt: now });
-    append_('Transactions', { TxnID: id_('TX'), Date: now, Type: type, ItemID: item.ItemID, Code: padCode_(item.Code), Name: item.Name, Quantity: q, Unit: item.Unit, Requester: req, Department: dept, Note: note, CreatedAt: now, BatchID: batchId });
+    append_('Transactions', { TxnID: id_('TX'), Date: now, Type: type, ItemID: item.ItemID, Code: padCode_(item.Code), Name: item.Name, Quantity: q, Unit: item.Unit, Requester: req, Department: dept, Note: note, CreatedAt: now, BatchID: batchId, Email: email });
     result.push({ Code: padCode_(item.Code), Name: item.Name, Quantity: q, Unit: item.Unit, Remaining: next, Created: false });
   });
 
@@ -390,13 +392,13 @@ function recordBatch(p) {
       maxCode += 1;
       const rec = { ItemID: id_('IT'), Code: padCode_(maxCode), Name: n.name, Category: n.category, Unit: n.unit, Quantity: n.qty, MinStock: 5, Price: 0, Location: '', Type: 'พัสดุ', Status: 'ใช้งาน', UpdatedAt: now, Notes: '' };
       append_('Inventory', rec);
-      append_('Transactions', { TxnID: id_('TX'), Date: now, Type: 'IN', ItemID: rec.ItemID, Code: rec.Code, Name: rec.Name, Quantity: n.qty, Unit: rec.Unit, Requester: req, Department: dept, Note: note, CreatedAt: now, BatchID: batchId });
+      append_('Transactions', { TxnID: id_('TX'), Date: now, Type: 'IN', ItemID: rec.ItemID, Code: rec.Code, Name: rec.Name, Quantity: n.qty, Unit: rec.Unit, Requester: req, Department: dept, Note: note, CreatedAt: now, BatchID: batchId, Email: email });
       result.push({ Code: rec.Code, Name: rec.Name, Quantity: n.qty, Unit: rec.Unit, Remaining: n.qty, Created: true });
     });
   }
 
   if (type === 'OUT') {
-    notifyChatWithdrawal_({ batchId: batchId, now: now, req: req, dept: dept, note: note,
+    notifyChatWithdrawal_({ batchId: batchId, now: now, req: req, email: email, dept: dept, note: note,
       source: 'แดชบอร์ด · เบิกออกหลายรายการ', count: result.length, items: result });
   }
   return { saved: true, count: result.length, type: type, items: result, batchId: batchId, data: getDashboard() };
@@ -424,12 +426,13 @@ function recordWithdrawalBatch(p) {
   const req = String(p.Requester || '').trim();
   const dept = p.Department || '';
   const note = p.Note || '';
+  const email = String(p.Email || '').trim();
   plan.forEach(function (row) {
     update_('Inventory', 'ItemID', row.item.ItemID, { Quantity: row.next, UpdatedAt: now });
-    append_('Transactions', { TxnID: id_('TX'), Date: now, Type: 'OUT', ItemID: row.item.ItemID, Code: padCode_(row.item.Code), Name: row.item.Name, Quantity: row.q, Unit: row.item.Unit, Requester: req, Department: dept, Note: note, CreatedAt: now, BatchID: batchId });
+    append_('Transactions', { TxnID: id_('TX'), Date: now, Type: 'OUT', ItemID: row.item.ItemID, Code: padCode_(row.item.Code), Name: row.item.Name, Quantity: row.q, Unit: row.item.Unit, Requester: req, Department: dept, Note: note, CreatedAt: now, BatchID: batchId, Email: email });
   });
   const receipt = plan.map(function (r) { return { Code: padCode_(r.item.Code), Name: r.item.Name, Quantity: r.q, Unit: r.item.Unit, Remaining: r.next }; });
-  notifyChatWithdrawal_({ batchId: batchId, now: now, req: req, dept: dept, note: note,
+  notifyChatWithdrawal_({ batchId: batchId, now: now, req: req, email: email, dept: dept, note: note,
     source: 'หน้าเบิกพัสดุ (withdraw.html)', count: receipt.length, items: receipt });
   return { saved: true, count: plan.length, batchId: batchId, receipt: receipt, data: getItemList() };
 }
