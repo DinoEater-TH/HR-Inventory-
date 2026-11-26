@@ -234,7 +234,16 @@ function getDashboard() {
   const low=inventory.filter(x=>num_(x.Quantity)<=num_(x.MinStock)&&String(x.Status||'ใช้งาน')!=='ยกเลิก');
   const totalQty=inventory.reduce((a,x)=>a+num_(x.Quantity),0), totalValue=inventory.reduce((a,x)=>a+num_(x.Quantity)*num_(x.Price),0);
   const cats={}; inventory.forEach(x=>cats[x.Category||'ไม่ระบุ']=(cats[x.Category||'ไม่ระบุ']||0)+num_(x.Quantity));
-  return json_({inventory,assets,assetLoans,transactions:tx.slice(-100).reverse(),low,categories:cats,nextItemCode:nextCode_(inventory,'Code'),summary:{items:inventory.length,quantity:totalQty,value:totalValue,assets:assets.length,low:low.length}});
+  // สถิติการเบิกสะสมทั้งหมด (ทุกครั้ง) ต่อรายการพัสดุ — ใช้จัดอันดับ "เบิกมาก/น้อยที่สุด"
+  const wmap={};
+  tx.forEach(function(t){
+    if(String(t.Type||'').toUpperCase()!=='OUT')return;
+    const k=String(t.ItemID||''); if(!k)return;
+    if(!wmap[k])wmap[k]={ItemID:k,Code:padCode_(t.Code),Name:t.Name||'',Unit:t.Unit||'',Quantity:0};
+    wmap[k].Quantity+=num_(t.Quantity);
+  });
+  const withdrawStats=Object.keys(wmap).map(function(k){return wmap[k]}).sort(function(a,b){return b.Quantity-a.Quantity});
+  return json_({inventory,assets,assetLoans,transactions:tx.slice(-100).reverse(),low,categories:cats,withdrawStats,nextItemCode:nextCode_(inventory,'Code'),summary:{items:inventory.length,quantity:totalQty,value:totalValue,assets:assets.length,low:low.length}});
 }
 // ประวัติการเบิก–รับเข้า: จัดกลุ่มเป็น "ครั้ง/ใบ" พร้อมรายการพัสดุในแต่ละครั้ง
 function getTransactionHistory(p) {
