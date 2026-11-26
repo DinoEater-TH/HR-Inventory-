@@ -938,7 +938,9 @@ function txnSave(){if(svBusy)return;if(txnType==='ADJUST'){svStart(8,'กำล�
   render = function () { base.apply(null, arguments); draw(); loadHistory(); };
   draw();
   loadHistory();
+  console.log('BLOCK3-BEFORE-LOAD');
   load();
+  console.log('BLOCK3-AFTER-LOAD-CALL');
   setInterval(function () { if (document.visibilityState === 'visible') loadHistory(); }, 60000);
 })();
 </script>
