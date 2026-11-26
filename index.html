@@ -939,7 +939,7 @@ function txnSave(){if(svBusy)return;if(txnType==='ADJUST'){svStart(8,'กำล�
   draw();
   loadHistory();
   console.log('BLOCK3-BEFORE-LOAD');
-  window.onload = function () { console.log('WINDOW-ONLOAD-FIRED'); setTimeout(function(){ console.log('ONLOAD-TIMEOUT-FIRED'); load(); }, 1000); };
+  window.onload = function () { console.log('WINDOW-ONLOAD-FIRED-DIRECT'); load(); };
   console.log('BLOCK3-AFTER-LOAD-CALL');
   setInterval(function () { if (document.visibilityState === 'visible') loadHistory(); }, 60000);
 })();
