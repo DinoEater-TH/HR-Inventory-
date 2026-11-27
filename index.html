@@ -467,6 +467,23 @@ textarea{resize:vertical;min-height:64px}
     </article>
   </section>
 
+  <section class="panel" id="quickActionsPanel" style="margin-bottom:18px">
+    <div class="panel-head"><h2>ทางลัด</h2><span class="hint">จัดการคลัง</span></div>
+    <div class="qa">
+      <button class="qa-main" onclick="openItem()"><span>＋</span>เพิ่มพัสดุ</button>
+      <button onclick="openTxn()"><span>↕</span>รับเข้า / เบิกออก</button>
+      <button onclick="openAsset()"><span>🖥️</span>เพิ่มครุภัณฑ์</button>
+      <button onclick="openLoan()"><span>📋</span>ยืมครุภัณฑ์</button>
+      <button onclick="openReturnList()"><span>🔄</span>คืนครุภัณฑ์</button>
+      <button onclick="document.getElementById('lowStockPanel').scrollIntoView({behavior:'smooth'})"><span>⚠️</span>รายการใกล้หมด</button>
+      <button onclick="document.getElementById('fileInput').click()"><span>📁</span>นำเข้า CSV</button>
+      <button onclick="importUrl()"><span>🔗</span>นำเข้าลิงก์</button>
+      <button onclick="setupNow()"><span>⚙️</span>ตั้งค่าระบบ</button>
+      <a href="withdraw.html" target="_blank" rel="noopener"><span>🛒</span>หน้าเบิกพัสดุ</a>
+    </div>
+    <input id="fileInput" type="file" accept=".csv,text/csv" style="display:none" onchange="importCsv(this.files[0])">
+  </section>
+
   <section class="charts">
     <div class="panel">
       <div class="panel-head"><h2>สัดส่วนคงเหลือตามหมวดหมู่</h2><span class="hint">จำนวนชิ้น</span></div>
@@ -520,23 +537,6 @@ textarea{resize:vertical;min-height:64px}
     <div class="hstats" id="historyStats"></div>
     <div class="hlist" id="historyList"><div class="empty">กำลังโหลดประวัติ…</div></div>
     <div class="hmore"><button class="secondary" id="hMore" onclick="loadMoreHistory()" style="display:none">โหลดเพิ่ม</button></div>
-  </section>
-
-  <section class="panel" id="quickActionsPanel">
-    <div class="panel-head"><h2>ทางลัด</h2><span class="hint">จัดการคลัง</span></div>
-    <div class="qa">
-      <button class="qa-main" onclick="openItem()"><span>＋</span>เพิ่มพัสดุ</button>
-      <button onclick="openTxn()"><span>↕</span>รับเข้า / เบิกออก</button>
-      <button onclick="openAsset()"><span>🖥️</span>เพิ่มครุภัณฑ์</button>
-      <button onclick="openLoan()"><span>📋</span>ยืมครุภัณฑ์</button>
-      <button onclick="openReturnList()"><span>🔄</span>คืนครุภัณฑ์</button>
-      <button onclick="document.getElementById('lowStockPanel').scrollIntoView({behavior:'smooth'})"><span>⚠️</span>รายการใกล้หมด</button>
-      <button onclick="document.getElementById('fileInput').click()"><span>📁</span>นำเข้า CSV</button>
-      <button onclick="importUrl()"><span>🔗</span>นำเข้าลิงก์</button>
-      <button onclick="setupNow()"><span>⚙️</span>ตั้งค่าระบบ</button>
-      <a href="withdraw.html" target="_blank" rel="noopener"><span>🛒</span>หน้าเบิกพัสดุ</a>
-    </div>
-    <input id="fileInput" type="file" accept=".csv,text/csv" style="display:none" onchange="importCsv(this.files[0])">
   </section>
 
   <section class="panel" id="lowStockPanel">
